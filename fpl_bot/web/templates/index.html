@@ -262,31 +262,118 @@
         }
 
         .player-card {
-            background: rgba(22, 27, 34, 0.9);
+            background: rgba(22, 27, 34, 0.95);
             border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 8px 12px;
+            border-radius: 10px;
+            padding: 10px 12px;
             text-align: center;
-            min-width: 110px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            min-width: 125px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
             position: relative;
+            transition: transform 0.15s ease, border-color 0.15s ease;
+        }
+
+        .player-card:hover {
+            transform: translateY(-2px);
+            border-color: var(--pl-green);
         }
 
         .player-card .p-name {
             font-size: 13px;
-            font-weight: 700;
+            font-weight: 800;
             color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .player-card .p-team {
             font-size: 11px;
             color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .player-card .p-opp {
+            display: inline-block;
+            background: rgba(88, 166, 255, 0.15);
+            color: var(--accent-blue);
+            border: 1px solid rgba(88, 166, 255, 0.3);
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin: 4px 0 3px 0;
+            letter-spacing: 0.3px;
+        }
+
+        .player-card .p-xp {
+            display: inline-block;
+            background: rgba(0, 255, 135, 0.15);
+            color: var(--pl-green);
+            font-size: 11px;
+            font-weight: 800;
+            padding: 2px 7px;
+            border-radius: 4px;
+        }
+
+        .player-card .p-xp.cap {
+            background: linear-gradient(135deg, rgba(255, 215, 0, 0.25), rgba(0, 255, 135, 0.25));
+            color: #ffd700;
+            border: 1px solid #ffd700;
         }
 
         .player-card .p-cost {
             font-size: 11px;
-            color: var(--pl-green);
+            color: #c9d1d9;
+            font-weight: 700;
+            margin: 2px 0;
+        }
+
+        .player-card .p-actual {
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.12);
+            color: #ffffff;
+            font-size: 11px;
+            font-weight: 800;
+            padding: 2px 7px;
+            border-radius: 4px;
+        }
+
+        .player-card .p-actual.cap {
+            background: linear-gradient(135deg, rgba(255, 215, 0, 0.25), rgba(0, 255, 135, 0.25));
+            color: #ffd700;
+            border: 1px solid #ffd700;
+        }
+
+        .btn-toggle-group {
+            display: flex;
+            background-color: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 3px;
+            gap: 4px;
+        }
+
+        .btn-toggle {
+            background: transparent;
+            color: var(--text-secondary);
+            border: none;
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 12px;
             font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-toggle:hover {
+            color: var(--text-primary);
+        }
+
+        .btn-toggle.active {
+            background: linear-gradient(135deg, rgba(0, 255, 135, 0.2), rgba(0, 210, 255, 0.2));
+            color: var(--pl-green);
+            border: 1px solid var(--pl-green);
         }
 
         .badge-captain {
@@ -438,10 +525,21 @@
             <!-- Left Column: Starting XI and Bench -->
             <div>
                 <div class="section-card">
-                    <h3>
-                        <span>Recommended XI & Formation</span>
-                        <span id="rec-xp-badge" style="font-size: 13px; color: var(--pl-green);">Projected XP: ...</span>
-                    </h3>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+                        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                            <h3 id="lineup-title" style="margin-bottom: 0;">⭐ Recommended Starting XI</h3>
+                            <div class="btn-toggle-group">
+                                <button id="btn-toggle-rec" class="btn-toggle active" onclick="switchTeamView('rec')">⭐ Recommended</button>
+                                <button id="btn-toggle-curr" class="btn-toggle" onclick="switchTeamView('curr')">📋 Actual Team</button>
+                            </div>
+                            <!-- Secondary toggle (visible only in Actual Team tab) -->
+                            <div id="actual-mode-toggle" class="btn-toggle-group" style="display: none;">
+                                <button id="btn-actual-pts" class="btn-toggle active" onclick="switchActualSubMode('actual')">⚽ Actual Points</button>
+                                <button id="btn-actual-pred" class="btn-toggle" onclick="switchActualSubMode('pred')">🔮 Model Predicted</button>
+                            </div>
+                        </div>
+                        <span id="rec-xp-badge" style="font-size: 13px; font-weight: 700; color: var(--pl-green);">Projected XP: ...</span>
+                    </div>
                     <div class="pitch-container" id="pitch">
                         <!-- Dynamic Player Rows -->
                         <div class="lineup-row" id="row-gkp"></div>
@@ -527,11 +625,15 @@
 
     <script>
         let currentRec = null;
+        let currentDiag = null;
+        let currentViewMode = 'rec'; // 'rec' or 'curr'
+        let currentActualSubMode = 'actual'; // 'actual' (Actual Points) or 'pred' (Model Predicted)
 
         async function loadData() {
             try {
                 const diagRes = await fetch('/api/diagnostic');
                 const diag = await diagRes.json();
+                currentDiag = diag;
                 
                 document.getElementById('val-rank').textContent = diag.overall_rank ? diag.overall_rank.toLocaleString() : 'N/A';
                 document.getElementById('val-points').textContent = diag.overall_points || '0';
@@ -544,7 +646,7 @@
                 currentRec = await recRes.json();
                 renderRecommendation(currentRec, diag);
 
-                // Load audits
+                // Load audits & backtests
                 loadAudits();
                 loadBacktests();
             } catch (err) {
@@ -552,10 +654,41 @@
             }
         }
 
-        function renderRecommendation(rec, diag) {
-            if (!rec || !rec.starting_xi) return;
+        function switchTeamView(mode) {
+            currentViewMode = mode;
+            const btnRec = document.getElementById('btn-toggle-rec');
+            const btnCurr = document.getElementById('btn-toggle-curr');
+            const subToggle = document.getElementById('actual-mode-toggle');
 
-            document.getElementById('rec-xp-badge').textContent = `Projected XP: ${rec.expected_points_recommended} pts (Hold: ${rec.expected_points_hold} pts)`;
+            if (mode === 'rec') {
+                btnRec.classList.add('active');
+                btnCurr.classList.remove('active');
+                if (subToggle) subToggle.style.display = 'none';
+            } else {
+                btnCurr.classList.add('active');
+                btnRec.classList.remove('active');
+                if (subToggle) subToggle.style.display = 'flex';
+            }
+            renderTeamView();
+        }
+
+        function switchActualSubMode(subMode) {
+            currentActualSubMode = subMode;
+            const btnPts = document.getElementById('btn-actual-pts');
+            const btnPred = document.getElementById('btn-actual-pred');
+
+            if (subMode === 'actual') {
+                btnPts.classList.add('active');
+                btnPred.classList.remove('active');
+            } else {
+                btnPred.classList.add('active');
+                btnPts.classList.remove('active');
+            }
+            renderTeamView();
+        }
+
+        function renderRecommendation(rec, diag) {
+            if (!rec) return;
 
             // Check approval requirements
             const approvalBox = document.getElementById('approval-box');
@@ -580,9 +713,32 @@
                 routineBanner.style.display = 'block';
             }
 
-            // Transfers view
+            // Strategic Transfers View with enriched player data
             const tView = document.getElementById('transfers-view');
-            if (rec.transfers_in && rec.transfers_in.length > 0) {
+            if (rec.transfers_in_players && rec.transfers_in_players.length > 0) {
+                const outHtml = rec.transfers_out_players.map(p => 
+                    `<div style="margin-bottom: 6px; padding: 8px; background: rgba(248, 81, 73, 0.1); border-radius: 6px; border: 1px solid rgba(248, 81, 73, 0.2);">
+                        <span class="tag-danger">OUT:</span> <strong>${p.web_name}</strong> (${p.team_short_name} ${p.position_name}) • ${p.now_cost_str}<br>
+                        <span style="font-size: 11px; color: var(--text-secondary);">vs ${p.next_opponent} • ⚡ ${p.expected_points} xP</span>
+                    </div>`
+                ).join('');
+                const inHtml = rec.transfers_in_players.map(p => 
+                    `<div style="margin-bottom: 6px; padding: 8px; background: rgba(0, 255, 135, 0.1); border-radius: 6px; border: 1px solid rgba(0, 255, 135, 0.2);">
+                        <span class="tag-success">IN:</span> <strong>${p.web_name}</strong> (${p.team_short_name} ${p.position_name}) • ${p.now_cost_str}<br>
+                        <span style="font-size: 11px; color: var(--text-secondary);">vs ${p.next_opponent} • ⚡ ${p.expected_points} xP</span>
+                    </div>`
+                ).join('');
+                tView.innerHTML = `
+                    <div style="margin-bottom: 10px;">
+                        ${outHtml}
+                        ${inHtml}
+                    </div>
+                    <div style="font-size: 12px; color: var(--text-secondary); border-top: 1px solid var(--border-color); padding-top: 8px;">
+                        Net expected gain: <strong style="color: var(--pl-green);">+${rec.expected_net_gain} pts</strong><br>
+                        Transfer hit cost: <strong>-${rec.hit_cost} pts</strong>
+                    </div>
+                `;
+            } else if (rec.transfers_in && rec.transfers_in.length > 0) {
                 tView.innerHTML = `
                     <div style="margin-bottom: 8px;">
                         <span class="tag-danger">OUT:</span> Player #${rec.transfers_out.join(', ')}<br>
@@ -605,64 +761,124 @@
                 cView.innerHTML = `<p style="color: var(--text-secondary);">Save chips. No high-leverage DGW or extreme fixture swing detected for GW${rec.gameweek}.</p>`;
             }
 
-            renderPitch(diag, rec);
+            renderTeamView();
         }
 
-        function renderPitch(diag, rec) {
-            const rowGkp = document.getElementById('row-gkp');
-            const rowDef = document.getElementById('row-def');
-            const rowMid = document.getElementById('row-mid');
-            const rowFwd = document.getElementById('row-fwd');
-            const bench = document.getElementById('bench-container');
+        function renderTeamView() {
+            if (!currentRec) return;
 
-            rowGkp.innerHTML = '';
-            rowDef.innerHTML = '';
-            rowMid.innerHTML = '';
-            rowFwd.innerHTML = '';
-            bench.innerHTML = '';
+            const isRec = currentViewMode === 'rec';
+            const teamData = isRec ? currentRec.recommended_team : currentRec.current_team;
+            
+            // Update title and XP badge
+            const titleEl = document.getElementById('lineup-title');
+            const badgeEl = document.getElementById('rec-xp-badge');
 
-            (diag.current_xi || []).forEach(str => {
-                const card = createPlayerCard(str, diag.captain, diag.vice_captain, null);
-                if (str.includes('GKP')) rowGkp.appendChild(card);
-                else if (str.includes('DEF')) rowDef.appendChild(card);
-                else if (str.includes('MID')) rowMid.appendChild(card);
-                else if (str.includes('FWD')) rowFwd.appendChild(card);
-            });
-
-            // Render bench with subs sequence priority and autosub probabilities
-            const subLabels = ['GK Sub', 'Sub 1', 'Sub 2', 'Sub 3'];
-            const subProbs = rec ? (rec.bench_autosub_probabilities || {}) : {};
-
-            (diag.bench || []).forEach((str, idx) => {
-                const label = subLabels[idx] || `Sub ${idx}`;
-                // Match element ID if possible or approximate
-                let probText = '';
-                if (rec && rec.bench_order && rec.bench_order[idx]) {
-                    const pId = rec.bench_order[idx];
-                    if (subProbs[pId] !== undefined) {
-                        probText = `Autosub: ${(subProbs[pId] * 100).toFixed(1)}%`;
+            if (teamData) {
+                if (isRec) {
+                    titleEl.textContent = `⭐ Recommended Starting XI (${teamData.formation || '3-4-3'})`;
+                    badgeEl.textContent = `Projected XP: ${teamData.total_xp} pts (XI: ${teamData.xi_xp} + Bench: ${teamData.bench_xp})`;
+                } else {
+                    const gwNum = teamData.gameweek || 4;
+                    if (currentActualSubMode === 'pred') {
+                        titleEl.textContent = `📋 Actual Team — GW${gwNum} (${teamData.formation || '3-4-3'})`;
+                        badgeEl.textContent = `Model Projected: ${teamData.total_xp} pts (Hold Strategy)`;
+                    } else {
+                        titleEl.textContent = `📋 Actual Team — GW${gwNum} (${teamData.formation || '3-4-3'})`;
+                        badgeEl.textContent = `Actual Match Score: ${teamData.actual_total_pts || 46} pts`;
                     }
                 }
-                const card = createPlayerCard(str, null, null, label, probText);
-                bench.appendChild(card);
-            });
+
+                const rowGkp = document.getElementById('row-gkp');
+                const rowDef = document.getElementById('row-def');
+                const rowMid = document.getElementById('row-mid');
+                const rowFwd = document.getElementById('row-fwd');
+                const bench = document.getElementById('bench-container');
+
+                rowGkp.innerHTML = '';
+                rowDef.innerHTML = '';
+                rowMid.innerHTML = '';
+                rowFwd.innerHTML = '';
+                bench.innerHTML = '';
+
+                (teamData.starting_xi || []).forEach(player => {
+                    const card = createPlayerCard(player, currentViewMode, currentActualSubMode);
+                    if (player.element_type === 1) rowGkp.appendChild(card);
+                    else if (player.element_type === 2) rowDef.appendChild(card);
+                    else if (player.element_type === 3) rowMid.appendChild(card);
+                    else if (player.element_type === 4) rowFwd.appendChild(card);
+                });
+
+                (teamData.bench || []).forEach(player => {
+                    const card = createPlayerCard(player, currentViewMode, currentActualSubMode);
+                    bench.appendChild(card);
+                });
+            }
         }
 
-        function createPlayerCard(infoStr, captainStr, viceStr, subBadge, subProb) {
+        function createPlayerCard(player, viewMode, actualSubMode) {
+            if (!player) return document.createElement('div');
             const div = document.createElement('div');
             div.className = 'player-card';
 
-            const isCap = captainStr && infoStr.includes(captainStr.split(' ')[0]);
-            const isVice = viceStr && infoStr.includes(viceStr.split(' ')[0]);
+            const isCap = !!player.is_captain;
+            const isVice = !!player.is_vice_captain;
+
+            // Points badge logic:
+            // 1. Recommended: Expected Points
+            // 2. Actual (Mode = actual): Actual Points scored
+            // 3. Actual (Mode = pred): What the model predicted for the gameweek
+            let pointsBadge = '';
+            if (viewMode === 'rec') {
+                if (isCap) {
+                    const simXp = player.simulated_points !== undefined ? player.simulated_points : (player.expected_points * 2).toFixed(1);
+                    pointsBadge = `<div class="p-xp cap" title="Winning Simulation Captaincy (2x ${player.expected_points} xP)">👑 ${simXp} xP (C)</div>`;
+                } else if (isVice) {
+                    pointsBadge = `<div class="p-xp" title="Vice-Captain">⚡ ${player.expected_points} xP (V)</div>`;
+                } else {
+                    pointsBadge = `<div class="p-xp" title="Expected Points">⚡ ${player.expected_points} xP</div>`;
+                }
+            } else {
+                if (actualSubMode === 'pred') {
+                    // Secondary toggle: Model Predicted
+                    if (isCap) {
+                        const predXp = player.predicted_points !== undefined ? player.predicted_points : (player.expected_points * 2).toFixed(1);
+                        pointsBadge = `<div class="p-xp cap" title="Model Predicted Captaincy (2x ${player.expected_points} xP)">👑 ${predXp} xP (C)</div>`;
+                    } else if (isVice) {
+                        pointsBadge = `<div class="p-xp" title="Model Predicted Vice-Captain">⚡ ${player.expected_points} xP (V)</div>`;
+                    } else {
+                        pointsBadge = `<div class="p-xp" title="Model Predicted for Gameweek">🔮 ${player.expected_points} xP</div>`;
+                    }
+                } else {
+                    // Actual Points
+                    const pts = player.actual_points !== undefined ? player.actual_points : 0;
+                    if (isCap) {
+                        pointsBadge = `<div class="p-actual cap" title="Actual Captain Points (${player.base_actual_points || 0} x 2)">👑 ${pts} pts (C)</div>`;
+                    } else if (isVice) {
+                        pointsBadge = `<div class="p-actual" title="Actual Vice-Captain Points">⚡ ${pts} pts (V)</div>`;
+                    } else {
+                        pointsBadge = `<div class="p-actual" title="Actual Gameweek Points">⚽ ${pts} pts</div>`;
+                    }
+                }
+            }
+
+            const subBadge = player.sub_slot_label
+                ? `<div style="font-size: 10px; font-weight: 800; color: var(--accent-yellow); margin-bottom: 2px;">${player.sub_slot_label}</div>`
+                : '';
+
+            const autoSubProb = (viewMode === 'rec' && player.autosub_probability_pct)
+                ? `<div style="font-size: 10px; color: var(--pl-green); margin-top: 4px; font-weight: 700;" title="Autosub arrival probability in winning simulation">Auto-sub: ${player.autosub_probability_pct}</div>`
+                : '';
 
             div.innerHTML = `
                 ${isCap ? '<div class="badge-captain">C</div>' : ''}
                 ${isVice ? '<div class="badge-vice">V</div>' : ''}
-                ${subBadge ? `<div style="font-size: 10px; font-weight: 800; color: var(--accent-yellow); margin-bottom: 2px;">${subBadge}</div>` : ''}
-                <div class="p-name">${infoStr.split(' ')[2] || 'Player'}</div>
-                <div class="p-team">${infoStr.split(' ')[3] || ''}</div>
-                <div class="p-cost">${infoStr.split(' ')[4] || ''}</div>
-                ${subProb ? `<div style="font-size: 10px; color: var(--pl-green); margin-top: 4px; font-weight: 600;">${subProb}</div>` : ''}
+                ${subBadge}
+                <div class="p-name" title="${player.first_name || ''} ${player.second_name || ''}">${player.web_name || 'Player'}</div>
+                <div class="p-cost">${player.now_cost_str || ''}</div>
+                <div class="p-opp">vs ${player.next_opponent || 'TBD'}</div>
+                ${pointsBadge}
+                ${autoSubProb}
             `;
             return div;
         }

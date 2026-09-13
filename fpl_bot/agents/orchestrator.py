@@ -237,5 +237,139 @@ class Orchestrator:
         db.save_recommendation(recommendation.model_dump())
         return recommendation
 
+    def get_enriched_teams_data(self, rec: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Enriches a recommendation with detailed player objects, opponents, expected points,
+        and current vs recommended team breakdowns for the Web UI.
+        """
+        gw_id = rec.get("gameweek", 5)
+        players_map, teams_map, _ = self.player_data.get_all_players_and_teams()
+        fixture_scores = fixture_agent.analyze_all_teams(list(teams_map.values()), gw_id)
+        availabilities = availability_agent.evaluate_squad_availability(list(players_map.values()))
+        projections = projection_agent.generate_all_projections(
+            list(players_map.values()), gw_id, fixture_scores, availabilities
+        )
+
+        sub_probs = rec.get("bench_autosub_probabilities") or {}
+
+        # 2. Current Team & Live match points for current squad event
+        current_squad = self.player_data.get_current_squad()
+        squad_gw = current_squad.event
+        live_pts_map = {}
+        try:
+            live_data = self.api.get_event_live(squad_gw)
+            for el in live_data.get("elements", []):
+                live_pts_map[el["id"]] = el.get("stats", {}).get("total_points", 0)
+        except Exception:
+            pass
+
+        def player_to_dict(
+            pid: int,
+            is_cap: bool = False,
+            is_vice: bool = False,
+            sub_label: Optional[str] = None,
+            autosub_prob: Optional[float] = None
+        ) -> Dict[str, Any]:
+            p = players_map.get(pid)
+            if not p:
+                return {}
+            proj = projections.get(pid)
+            xp = proj.expected_fpl_points if proj else 0.0
+
+            # Live actual points
+            base_actual = live_pts_map.get(pid, getattr(p, "event_points", 0))
+            actual_effective = base_actual * 2 if is_cap else base_actual
+            sim_xp = round(xp * 2, 1) if is_cap else (round(xp * autosub_prob, 2) if autosub_prob is not None else round(xp, 1))
+
+            return {
+                "id": p.id,
+                "web_name": p.web_name,
+                "first_name": p.first_name,
+                "second_name": p.second_name,
+                "team_short_name": p.team_short_name,
+                "team_name": p.team_name,
+                "position_name": p.position_name,
+                "element_type": p.element_type,
+                "now_cost": p.now_cost,
+                "now_cost_str": f"£{p.now_cost/10:.1f}m",
+                "next_opponent": p.next_opponent or "BLANK",
+                "expected_points": round(xp, 1),
+                "predicted_points": round(xp * 2, 1) if is_cap else round(xp, 1),
+                "simulated_points": sim_xp,
+                "actual_points": actual_effective,
+                "base_actual_points": base_actual,
+                "is_captain": is_cap,
+                "is_vice_captain": is_vice,
+                "sub_slot_label": sub_label,
+                "autosub_probability_pct": f"{autosub_prob*100:.1f}%" if autosub_prob is not None else None,
+            }
+
+        # 1. Recommended Team
+        rec_xi = [
+            player_to_dict(pid, is_cap=(pid == rec["captain_id"]), is_vice=(pid == rec["vice_captain_id"]))
+            for pid in rec.get("starting_xi", [])
+        ]
+        
+        bench_order = rec.get("bench_order", [])
+        rec_bench = []
+        if bench_order:
+            # Slot 12: GK Sub
+            gk_id = bench_order[0]
+            gk_prob = sub_probs.get(str(gk_id), sub_probs.get(gk_id))
+            rec_bench.append(player_to_dict(gk_id, sub_label="GK Sub", autosub_prob=gk_prob))
+
+            # Slots 13, 14, 15: Outfield Subs
+            for s_idx, sub_id in enumerate(bench_order[1:], start=1):
+                prob = sub_probs.get(str(sub_id), sub_probs.get(sub_id))
+                rec_bench.append(player_to_dict(sub_id, sub_label=f"Sub {s_idx}", autosub_prob=prob))
+
+        d_count = sum(1 for p in rec_xi if p.get("element_type") == 2)
+        m_count = sum(1 for p in rec_xi if p.get("element_type") == 3)
+        f_count = sum(1 for p in rec_xi if p.get("element_type") == 4)
+        rec_formation = f"{d_count}-{m_count}-{f_count}"
+
+        # 2. Current Team
+        curr_xi_picks = [p for p in current_squad.picks if p.position <= 11]
+        curr_bench_picks = [p for p in current_squad.picks if p.position > 11]
+
+        curr_xi = [
+            player_to_dict(p.element_id, is_cap=p.is_captain, is_vice=p.is_vice_captain)
+            for p in curr_xi_picks
+        ]
+        
+        curr_bench_labels = ["GK Sub", "Sub 1", "Sub 2", "Sub 3"]
+        curr_bench = [
+            player_to_dict(p.element_id, sub_label=curr_bench_labels[idx] if idx < 4 else "Sub")
+            for idx, p in enumerate(curr_bench_picks)
+        ]
+
+        curr_d = sum(1 for p in curr_xi if p.get("element_type") == 2)
+        curr_m = sum(1 for p in curr_xi if p.get("element_type") == 3)
+        curr_f = sum(1 for p in curr_xi if p.get("element_type") == 4)
+        curr_formation = f"{curr_d}-{curr_m}-{curr_f}"
+        curr_actual_total = sum(p.get("actual_points", 0) for p in curr_xi)
+
+        return {
+            "recommended_team": {
+                "formation": rec_formation,
+                "total_xp": rec.get("expected_points_recommended", 0.0),
+                "xi_xp": rec.get("starting_xi_expected_points", 0.0),
+                "bench_xp": rec.get("bench_expected_points", 0.0),
+                "starting_xi": rec_xi,
+                "bench": rec_bench
+            },
+            "current_team": {
+                "formation": curr_formation,
+                "gameweek": squad_gw,
+                "total_xp": rec.get("expected_points_hold", 0.0),
+                "actual_total_pts": curr_actual_total,
+                "starting_xi": curr_xi,
+                "bench": curr_bench
+            },
+            "transfers_in_players": [player_to_dict(pid) for pid in rec.get("transfers_in", [])],
+            "transfers_out_players": [player_to_dict(pid) for pid in rec.get("transfers_out", [])],
+        }
+
 
 orchestrator = Orchestrator()
+

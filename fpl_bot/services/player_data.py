@@ -79,6 +79,7 @@ class PlayerDataService:
                 form=float(el.get("form") or 0.0),
                 points_per_game=float(el.get("points_per_game") or 0.0),
                 total_points=el.get("total_points", 0),
+                event_points=el.get("event_points", 0),
                 selected_by_percent=float(el.get("selected_by_percent") or 0.0),
                 expected_goals=float(el.get("expected_goals") or 0.0),
                 expected_assists=float(el.get("expected_assists") or 0.0),

@@ -49,6 +49,9 @@ async def get_latest_recommendation():
         # Run one on the fly if none exists
         rec_obj = orchestrator.run_optimization_cycle()
         rec = db.get_latest_recommendation(rec_obj.gameweek)
+    if rec:
+        enriched = orchestrator.get_enriched_teams_data(rec)
+        rec.update(enriched)
     return JSONResponse(rec or {})
 
 

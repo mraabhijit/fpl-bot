@@ -27,6 +27,7 @@ class Player(BaseModel):
     form: float = 0.0
     points_per_game: float = 0.0
     total_points: int = 0
+    event_points: int = 0
     selected_by_percent: float = 0.0
     expected_goals: float = 0.0
     expected_assists: float = 0.0
