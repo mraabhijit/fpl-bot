@@ -82,7 +82,9 @@ class ProjectionAgent:
             delta = differential_trainer.predict_adjustment(
                 player_id=player.id,
                 element_type=player.element_type,
-                team_short_name=player.team_short_name
+                team_short_name=player.team_short_name,
+                player=player,
+                fixture_score=fixture_score
             )
         except Exception:
             delta = 0.0

@@ -152,15 +152,25 @@ python main.py scheduled --stage auto
 python main.py scheduled --stage primary --force
 ```
 
-### 7. Adaptive Differential Learning & Error Tracking
-Settle completed gameweek match telemetry, compute prediction residuals, and retrain the adaptive model:
+### 7. Adaptive Multi-Factor Differential Learning
+Settle completed gameweek match telemetry, compute prediction residuals, and retrain the adaptive model using regularized Multi-Factor Ridge Regression:
 ```bash
-# Retrain model on completed gameweeks using Bayesian Ridge shrinkage
+# Retrain model on completed gameweeks using Multi-Factor Ridge Regression
 python main.py retrain --gameweek 4
 
-# Inspect gameweek error report, positional bias, and top differentials
+# Inspect gameweek error report, learned feature weights, elite consensus, and team form
 python main.py differentials --gameweek 4
 ```
+
+Features incorporated in weekly retraining:
+- Historical Residual Prior: Empirical Bayes shrinkage over past gameweeks.
+- Player Form Trajectory: Form acceleration and goal involvement efficiency delta (GI vs xGI).
+- Team Form Dynamics: Rolling 3-match offensive potency and defensive fragility indices.
+- Elite Crowd Consensus: Effective ownership ($EO^{\text{elite}}$) and captaincy concentration among top overall managers in the world (League 314).
+- Market Transfer Momentum: Normalized net event transfer velocity from official telemetry.
+
+All retrained checkpoints are bounded within $[-2.0, +2.0]$ points to prevent erratic swings while systematically correcting model bias. Retraining executes autonomously inside GitHub Actions runners during post-gameweek workflow runs, with model weights and the SQLite database cached across runs via `actions/cache@v4`.
+
 
 ---
 
