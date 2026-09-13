@@ -44,6 +44,11 @@ def run_diagnostic():
     for chip in diag["available_chips"]:
         print(f"  {chip}")
     print("")
+    if diag.get("invitation_leagues"):
+        print("INVITATION LEAGUES:")
+        for lg in diag["invitation_leagues"]:
+            print(f"  {lg['name']} — Rank: {lg['rank']}")
+        print("")
     print("MINI-LEAGUES:")
     for lg in diag["mini_leagues"]:
         print(f"  {lg}")

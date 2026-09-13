@@ -3,6 +3,7 @@ Orchestrator coordinating all specialized agents, data flows, permissions, and e
 Section 2 of FPL-Optimizer.md.
 """
 
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 import zoneinfo
 from fpl_bot.core.config import settings
@@ -40,7 +41,20 @@ class Orchestrator:
         curr_gw = next((gw for gw in gameweeks if gw.is_current), None)
         next_gw = next((gw for gw in gameweeks if gw.is_next), None)
         gw_num = next_gw.id if next_gw else (curr_gw.id if curr_gw else 1)
-        deadline_str = next_gw.deadline_time if next_gw else "N/A"
+
+        deadline_str = "N/A"
+        deadline_ist = "N/A"
+        if next_gw and next_gw.deadline_time:
+            try:
+                target_tz = zoneinfo.ZoneInfo(settings.timezone)
+                iso_str = next_gw.deadline_time.replace("Z", "+00:00")
+                dt_utc = datetime.fromisoformat(iso_str)
+                dt_ist = dt_utc.astimezone(target_tz)
+                deadline_ist = dt_ist.strftime("%d %b %Y, %H:%M IST")
+                deadline_str = deadline_ist
+            except Exception:
+                deadline_str = next_gw.deadline_time
+                deadline_ist = next_gw.deadline_time
 
         entry = self.api.get_entry(settings.team_id)
         history = self.api.get_entry_history(settings.team_id)
@@ -61,6 +75,20 @@ class Orchestrator:
         available_chips = [c for c in all_chips if c.lower().replace(" 1", "").replace(" 2", "") not in used_chips]
 
         classic_leagues = entry.get("leagues", {}).get("classic", [])
+        h2h_leagues = entry.get("leagues", {}).get("h2h", [])
+
+        # Filter invitation/private leagues (league_type == "x")
+        invitation_leagues = []
+        for lg in classic_leagues + h2h_leagues:
+            if lg.get("league_type") == "x":
+                invitation_leagues.append({
+                    "id": lg.get("id"),
+                    "name": lg.get("name", "").strip(),
+                    "rank": lg.get("entry_rank"),
+                    "last_rank": lg.get("entry_last_rank"),
+                    "league_type": lg.get("league_type"),
+                })
+        primary_inv = invitation_leagues[0] if invitation_leagues else None
 
         diagnostic_data = {
             "fpl_connection": "OK",
@@ -69,9 +97,12 @@ class Orchestrator:
             "manager_name": f"{entry.get('player_first_name')} {entry.get('player_last_name')}",
             "current_gw": gw_num,
             "deadline": deadline_str,
+            "deadline_ist": deadline_ist,
             "timezone": settings.timezone,
             "overall_rank": latest_history.get("overall_rank", entry.get("summary_overall_rank", 0)),
             "overall_points": latest_history.get("total_points", entry.get("summary_overall_points", 0)),
+            "invitation_leagues": invitation_leagues,
+            "primary_invitation_league": primary_inv,
             "team_value": f"£{current_squad.value / 10:.1f}m",
             "bank": f"£{current_squad.bank / 10:.1f}m",
             "free_transfers": current_squad.free_transfers,

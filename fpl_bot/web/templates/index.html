@@ -480,7 +480,11 @@
             <div class="stat-card">
                 <div class="label">Overall Rank</div>
                 <div class="value" id="val-rank">...</div>
-                <div class="subtext" id="sub-rank">Percentile: ...</div>
+            </div>
+            <div class="stat-card" id="card-inv-league">
+                <div class="label">Invitation League</div>
+                <div class="value" id="val-inv-rank">...</div>
+                <div class="subtext" id="val-inv-name" style="color: var(--accent-blue); font-weight: 600;">...</div>
             </div>
             <div class="stat-card">
                 <div class="label">Total Points</div>
@@ -493,8 +497,8 @@
                 <div class="subtext" id="val-ft">Free Transfers: ...</div>
             </div>
             <div class="stat-card">
-                <div class="label">Upcoming Deadline</div>
-                <div class="value" style="font-size: 20px;" id="val-deadline">...</div>
+                <div class="label">Upcoming Deadline (IST)</div>
+                <div class="value" style="font-size: 18px;" id="val-deadline">...</div>
                 <div class="subtext" id="val-countdown">Primary run: T-3h</div>
             </div>
         </div>
@@ -676,6 +680,26 @@
             }
         }
 
+        function formatToIST(val) {
+            if (!val || val === 'N/A') return 'N/A';
+            if (typeof val === 'string' && val.includes('IST')) return val;
+            try {
+                const d = new Date(val);
+                if (isNaN(d.getTime())) return val;
+                return d.toLocaleString('en-IN', {
+                    timeZone: 'Asia/Kolkata',
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false
+                }) + ' IST';
+            } catch (e) {
+                return val;
+            }
+        }
+
         async function loadData() {
             updateHostingBadge();
             try {
@@ -684,10 +708,30 @@
                 currentDiag = diag;
                 
                 document.getElementById('val-rank').textContent = diag.overall_rank ? diag.overall_rank.toLocaleString() : 'N/A';
+
+                // Invitation League Rank and Name (if any)
+                const invCard = document.getElementById('card-inv-league');
+                const invRankEl = document.getElementById('val-inv-rank');
+                const invNameEl = document.getElementById('val-inv-name');
+                const invLeagues = diag.invitation_leagues || (diag.primary_invitation_league ? [diag.primary_invitation_league] : []);
+                if (invLeagues && invLeagues.length > 0) {
+                    const primary = invLeagues[0];
+                    invRankEl.textContent = primary.rank !== undefined ? `Rank ${primary.rank}` : 'N/A';
+                    invNameEl.textContent = primary.name || 'Invitation League';
+                    if (invLeagues.length > 1) {
+                        invNameEl.textContent += ` (+${invLeagues.length - 1} more)`;
+                        invNameEl.title = invLeagues.map(l => `${l.name}: Rank ${l.rank}`).join('\n');
+                    }
+                    if (invCard) invCard.style.display = 'block';
+                } else {
+                    invRankEl.textContent = 'None';
+                    invNameEl.textContent = 'No invitation league';
+                }
+
                 document.getElementById('val-points').textContent = diag.overall_points || '0';
                 document.getElementById('val-funds').textContent = `${diag.bank} in Bank / ${diag.team_value}`;
                 document.getElementById('val-ft').textContent = `Free Transfers: ${diag.free_transfers}`;
-                document.getElementById('val-deadline').textContent = diag.deadline;
+                document.getElementById('val-deadline').textContent = formatToIST(diag.deadline_ist || diag.deadline);
 
                 // Load recommendation
                 const recRes = await apiFetch('/api/recommendation');
