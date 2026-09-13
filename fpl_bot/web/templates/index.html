@@ -468,6 +468,7 @@
                 <p>Team ID: 6834344 • 2026/27 • Autonomous Expected Points Maximizer (Asia/Kolkata)</p>
             </div>
             <div class="header-actions">
+                <span id="hosting-badge" class="badge" style="display: none;"></span>
                 <span id="mode-badge" class="badge badge-mode">DRY RUN MODE</span>
                 <button class="btn" onclick="openDiagnosticModal()">Diagnostic</button>
                 <button class="btn btn-primary" onclick="triggerOptimization()">Run Optimizer</button>
@@ -629,9 +630,56 @@
         let currentViewMode = 'rec'; // 'rec' or 'curr'
         let currentActualSubMode = 'actual'; // 'actual' (Actual Points) or 'pred' (Model Predicted)
 
-        async function loadData() {
+        const isStaticSite = window.location.hostname.includes('github.io') ||
+                             window.location.protocol === 'file:' ||
+                             window.location.pathname.endsWith('.html') ||
+                             window.location.pathname.includes('/dist/');
+        let useStaticFiles = isStaticSite;
+
+        function updateHostingBadge() {
+            const badge = document.getElementById('hosting-badge');
+            if (!badge) return;
+            badge.style.display = 'inline-block';
+            if (useStaticFiles) {
+                badge.textContent = 'GITHUB PAGES';
+                badge.style.backgroundColor = 'rgba(88, 166, 255, 0.15)';
+                badge.style.color = 'var(--accent-blue)';
+                badge.style.border = '1px solid var(--accent-blue)';
+            } else {
+                badge.textContent = 'LIVE API';
+                badge.style.backgroundColor = 'rgba(0, 255, 135, 0.15)';
+                badge.style.color = 'var(--pl-green)';
+                badge.style.border = '1px solid var(--pl-green)';
+            }
+        }
+
+        async function apiFetch(endpoint, options = {}) {
+            if (useStaticFiles) {
+                let baseName = endpoint.split('?')[0].replace(/^\/api\//, '');
+                return fetch(`./data/${baseName}.json`, options);
+            }
+
             try {
-                const diagRes = await fetch('/api/diagnostic');
+                const res = await fetch(endpoint, options);
+                if (!res.ok && res.status === 404) {
+                    useStaticFiles = true;
+                    updateHostingBadge();
+                    let baseName = endpoint.split('?')[0].replace(/^\/api\//, '');
+                    return fetch(`./data/${baseName}.json`, options);
+                }
+                return res;
+            } catch (err) {
+                useStaticFiles = true;
+                updateHostingBadge();
+                let baseName = endpoint.split('?')[0].replace(/^\/api\//, '');
+                return fetch(`./data/${baseName}.json`, options);
+            }
+        }
+
+        async function loadData() {
+            updateHostingBadge();
+            try {
+                const diagRes = await apiFetch('/api/diagnostic');
                 const diag = await diagRes.json();
                 currentDiag = diag;
                 
@@ -642,7 +690,7 @@
                 document.getElementById('val-deadline').textContent = diag.deadline;
 
                 // Load recommendation
-                const recRes = await fetch('/api/recommendation');
+                const recRes = await apiFetch('/api/recommendation');
                 currentRec = await recRes.json();
                 renderRecommendation(currentRec, diag);
 
@@ -885,7 +933,7 @@
 
         async function loadAudits() {
             try {
-                const res = await fetch('/api/audits?limit=8');
+                const res = await apiFetch('/api/audits?limit=8');
                 const logs = await res.json();
                 const tbody = document.getElementById('audit-table-body');
                 tbody.innerHTML = '';
@@ -903,11 +951,11 @@
 
         async function loadBacktests() {
             try {
-                const res = await fetch('/api/backtests');
+                const res = await apiFetch('/api/backtests');
                 const rows = await res.json();
                 const tbody = document.getElementById('backtest-table-body');
-                if (rows.length > 0) tbody.innerHTML = '';
-                rows.forEach(r => {
+                if (rows && rows.length > 0) tbody.innerHTML = '';
+                (rows || []).forEach(r => {
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
                         <td>GW${r.gameweek}</td>
@@ -924,6 +972,10 @@
         }
 
         async function runBacktest() {
+            if (useStaticFiles) {
+                alert("Static Mode (GitHub Pages):\nHistorical backtesting is pre-computed and bundled during the GitHub Actions deployment workflow.");
+                return;
+            }
             const tbody = document.getElementById('backtest-table-body');
             tbody.innerHTML = `<tr><td colspan="7" style="color: var(--pl-green); text-align: center;">Running historical backtesting simulation...</td></tr>`;
             await fetch('/api/backtests/run', { method: 'POST' });
@@ -933,11 +985,16 @@
 
         async function respondApproval(decision) {
             if (!currentRec) return;
+            if (useStaticFiles) {
+                alert(`Static Mode (GitHub Pages):\nTo record your approval decision (${decision}), trigger the GitHub Actions workflow with approval input or approve locally using the CLI / local server.`);
+                return;
+            }
+            const recId = currentRec.transaction_hash || currentRec.id;
             await fetch('/api/approval', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
-                    recommendation_id: currentRec.id,
+                    recommendation_id: recId,
                     decision: decision
                 })
             });
@@ -945,6 +1002,10 @@
         }
 
         async function triggerOptimization() {
+            if (useStaticFiles) {
+                alert("Static Mode (GitHub Pages):\nOptimizations execute automatically on schedule via GitHub Actions before every deadline.\n\nTo run an immediate cycle, go to GitHub -> Actions -> Autonomous FPL Optimizer -> Run workflow.");
+                return;
+            }
             await fetch('/api/recommendation/run', { method: 'POST' });
             loadData();
         }
@@ -952,9 +1013,13 @@
         async function openDiagnosticModal() {
             const modal = document.getElementById('diag-modal');
             modal.style.display = 'flex';
-            const res = await fetch('/api/diagnostic');
-            const data = await res.json();
-            document.getElementById('diag-content').textContent = JSON.stringify(data, null, 2);
+            try {
+                const res = await apiFetch('/api/diagnostic');
+                const data = await res.json();
+                document.getElementById('diag-content').textContent = JSON.stringify(data, null, 2);
+            } catch (e) {
+                document.getElementById('diag-content').textContent = "Diagnostic data unavailable.";
+            }
         }
 
         function closeDiagnosticModal() {

@@ -19,6 +19,12 @@ dependencies = [
     "rich>=13.9.0",
 ]
 
+[project.optional-dependencies]
+test = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+]
+
 [project.scripts]
 fpl-bot = "fpl_bot.cli:main"
 

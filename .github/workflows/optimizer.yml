@@ -1,0 +1,122 @@
+name: Autonomous FPL Optimizer & GitHub Pages
+
+on:
+  schedule:
+    # Run every 30 minutes to dynamically evaluate deadline milestones
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: 'Deadline stage milestone'
+        required: false
+        default: 'auto'
+        type: choice
+        options:
+          - auto
+          - initial
+          - refresh
+          - primary
+          - lineup_check
+          - final_audit
+          - safety_check
+          - routine_refresh
+      force:
+        description: 'Force optimization cycle execution'
+        required: false
+        default: true
+        type: boolean
+  push:
+    branches:
+      - master
+      - main
+    paths-ignore:
+      - 'README.md'
+      - 'docs/**'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: 'fpl-optimizer-pages'
+  cancel-in-progress: false
+
+jobs:
+  optimize-and-build:
+    runs-on: ubuntu-latest
+    env:
+      FPL_EMAIL: ${{ secrets.FPL_EMAIL }}
+      FPL_PASSWORD: ${{ secrets.FPL_PASSWORD }}
+      FPL_TEAM_ID: ${{ secrets.FPL_TEAM_ID || '6834344' }}
+      FPL_EXECUTION_MODE: ${{ secrets.FPL_EXECUTION_MODE || 'DRY_RUN' }}
+      FPL_TIMEZONE: 'Asia/Kolkata'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ".[test]"
+
+      - name: Restore SQLite database cache
+        uses: actions/cache/restore@v4
+        with:
+          path: fpl_bot/data/fpl_optimizer.db
+          key: fpl-db-${{ github.run_id }}
+          restore-keys: |
+            fpl-db-
+
+      - name: Run verification test suite
+        run: |
+          pytest tests/ -v
+
+      - name: Run scheduled optimization workflow
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if [ "${{ github.event.inputs.force }}" = "true" ]; then
+              python main.py scheduled --stage "${{ github.event.inputs.stage }}" --force
+            else
+              python main.py scheduled --stage "${{ github.event.inputs.stage }}"
+            fi
+          else
+            python main.py scheduled --stage auto
+          fi
+
+      - name: Export static dashboard for GitHub Pages
+        run: |
+          python main.py export --output-dir dist
+
+      - name: Save SQLite database cache
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: fpl_bot/data/fpl_optimizer.db
+          key: fpl-db-${{ github.run_id }}
+
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy-pages:
+    needs: optimize-and-build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

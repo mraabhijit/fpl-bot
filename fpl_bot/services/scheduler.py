@@ -115,5 +115,70 @@ class DeadlineScheduler:
             })
         return jobs
 
+    def check_and_run_scheduled_workflow(
+        self,
+        stage: str = "auto",
+        force: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Evaluates dynamic deadline timing against configured milestones
+        (T-24h, T-6h, T-3h, T-90m, T-30m, T-15m) for GitHub Actions automation.
+        """
+        from fpl_bot.agents.orchestrator import orchestrator
+
+        gw_info = self.get_next_gameweek_info()
+        if not gw_info:
+            return {"status": "NO_ACTIVE_GAMEWEEK", "executed": False}
+
+        gw_id = gw_info["id"]
+        deadline_utc = gw_info["deadline_utc"]
+        now_utc = datetime.now(timezone.utc)
+        mins_remaining = (deadline_utc - now_utc).total_seconds() / 60.0
+        hours_remaining = mins_remaining / 60.0
+
+        active_stage = None
+        # Detect active milestone if stage is auto
+        if stage == "auto":
+            if mins_remaining < 0:
+                active_stage = "post_deadline"
+                db.log_audit(gw_id, "DEADLINE_LOCKOUT", {"mins_past": abs(mins_remaining)}, "LOCKED")
+            elif 10 <= mins_remaining <= 20:
+                active_stage = "safety_check"      # T-15m
+            elif 20 < mins_remaining <= 45:
+                active_stage = "final_audit"       # T-30m
+            elif 75 <= mins_remaining <= 105:
+                active_stage = "lineup_check"      # T-90m
+            elif 165 <= mins_remaining <= 195:
+                active_stage = "primary"           # T-3h (User primary run)
+            elif 345 <= mins_remaining <= 375:
+                active_stage = "refresh"           # T-6h
+            elif 1410 <= mins_remaining <= 1470:
+                active_stage = "initial"           # T-24h
+            elif force:
+                active_stage = "manual_trigger"
+            else:
+                # Routine refresh
+                active_stage = "routine_refresh"
+        else:
+            active_stage = stage
+
+        # Execute optimization cycle if not locked out
+        executed = False
+        rec = None
+        if active_stage != "post_deadline":
+            rec = orchestrator.run_optimization_cycle(stage=active_stage)
+            executed = True
+
+        return {
+            "gameweek": gw_id,
+            "gameweek_name": gw_info["name"],
+            "deadline_local": gw_info["deadline_str"],
+            "hours_remaining": round(hours_remaining, 2),
+            "stage": active_stage,
+            "executed": executed,
+            "transaction_hash": rec.transaction_hash if rec else None,
+        }
+
 
 scheduler_service = DeadlineScheduler()
+

@@ -125,9 +125,39 @@ def run_server():
     uvicorn.run("fpl_bot.web.app:app", host=settings.web_host, port=settings.web_port, reload=True)
 
 
+def run_export(output_dir: str = "dist"):
+    from fpl_bot.services.static_export import export_static_site
+    print(f"Exporting static dashboard to '{output_dir}' for GitHub Pages...")
+    res = export_static_site(output_dir=output_dir)
+    print("Static export completed successfully:")
+    for k, v in res.items():
+        print(f"  {k}: {v}")
+
+
+def run_scheduled(stage: str = "auto", force: bool = False):
+    print(f"Checking scheduled deadline milestones (stage={stage}, force={force})...")
+    res = scheduler_service.check_and_run_scheduled_workflow(stage=stage, force=force)
+    print("Scheduled workflow execution summary:")
+    for k, v in res.items():
+        print(f"  {k}: {v}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Autonomous FPL Optimizer CLI")
-    parser.add_argument("command", choices=["diagnostic", "optimize", "backtest", "server"], help="Command to run")
+    subparsers = parser.add_subparsers(dest="command", help="Command to run")
+
+    subparsers.add_parser("diagnostic", help="Run diagnostic health check")
+    subparsers.add_parser("optimize", help="Run strategic optimization cycle")
+    subparsers.add_parser("backtest", help="Run historical backtesting")
+    subparsers.add_parser("server", help="Start web dashboard server")
+
+    export_p = subparsers.add_parser("export", help="Export static site for GitHub Pages")
+    export_p.add_argument("--output-dir", "-o", default="dist", help="Output directory for static site (default: dist)")
+
+    sched_p = subparsers.add_parser("scheduled", help="Run scheduled deadline workflow evaluation")
+    sched_p.add_argument("--stage", default="auto", help="Milestone stage (auto, initial, refresh, primary, lineup_check, final_audit, safety_check)")
+    sched_p.add_argument("--force", action="store_true", help="Force optimization run regardless of deadline window")
+
     args = parser.parse_args()
 
     if args.command == "diagnostic":
@@ -138,7 +168,14 @@ def main():
         run_backtests()
     elif args.command == "server":
         run_server()
+    elif args.command == "export":
+        run_export(output_dir=args.output_dir)
+    elif args.command == "scheduled":
+        run_scheduled(stage=args.stage, force=args.force)
+    else:
+        parser.print_help()
 
 
 if __name__ == "__main__":
     main()
+

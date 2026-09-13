@@ -9,3 +9,4 @@ dist/
 fpl_bot/data/session.json
 fpl_bot/data/*.db
 .env
+errors/
