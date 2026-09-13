@@ -59,7 +59,10 @@ async def get_latest_recommendation():
 async def trigger_optimization_run():
     try:
         rec = orchestrator.run_optimization_cycle(stage="manual_trigger")
-        return JSONResponse(rec.model_dump())
+        rec_dict = rec.model_dump()
+        enriched = orchestrator.get_enriched_teams_data(rec_dict)
+        rec_dict.update(enriched)
+        return JSONResponse(rec_dict)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

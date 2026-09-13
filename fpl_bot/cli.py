@@ -122,7 +122,7 @@ def run_backtests():
 def run_server():
     print(f"Starting FPL Optimizer Server on {settings.web_host}:{settings.web_port} (Timezone: {settings.timezone})...")
     scheduler_service.start()
-    uvicorn.run("fpl_bot.web.app:app", host=settings.web_host, port=settings.web_port, reload=False)
+    uvicorn.run("fpl_bot.web.app:app", host=settings.web_host, port=settings.web_port, reload=True)
 
 
 def main():
