@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "fpl-bot"
 version = "0.1.0"
 description = "Autonomous Fantasy Premier League Optimizer"
-readme = "FPL-Optimizer.md"
+readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "httpx>=0.28.0",
@@ -27,6 +27,9 @@ test = [
 
 [project.scripts]
 fpl-bot = "fpl_bot.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["fpl_bot*"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
