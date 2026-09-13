@@ -932,9 +932,46 @@
             if (teamData) {
                 const chipRec = (currentRec && (currentRec.chip_recommendation || (currentRec.recommended_team && currentRec.recommended_team.chip_recommendation))) || '';
                 const isBenchBoost = Boolean(teamData.is_bench_boost || (chipRec && chipRec.toLowerCase().includes('boost')));
-                const xiXp = typeof teamData.xi_xp === 'number' ? teamData.xi_xp : (teamData.total_xp || 0);
-                const benchXp = typeof teamData.bench_xp === 'number' ? teamData.bench_xp : 0;
-                const totalWithBench = Math.round((xiXp + benchXp) * 100) / 100;
+
+                // Calculate Starting XI sum dynamically to guarantee exact arithmetic match with pitch cards
+                let xiXp = 0;
+                (teamData.starting_xi || []).forEach(p => {
+                    if (isRec) {
+                        if (p.is_captain) {
+                            const sim = p.simulated_points !== undefined ? Number(p.simulated_points) : Number((p.expected_points * 2).toFixed(1));
+                            xiXp += sim;
+                        } else {
+                            xiXp += Number(p.expected_points || 0);
+                        }
+                    } else {
+                        if (currentActualSubMode === 'pred') {
+                            if (p.is_captain) {
+                                const pred = p.predicted_points !== undefined ? Number(p.predicted_points) : Number((p.expected_points * 2).toFixed(1));
+                                xiXp += pred;
+                            } else {
+                                xiXp += Number(p.expected_points || 0);
+                            }
+                        } else {
+                            xiXp += Number(p.actual_points !== undefined ? p.actual_points : 0);
+                        }
+                    }
+                });
+                xiXp = Math.round(xiXp * 10) / 10;
+
+                let benchXp = 0;
+                if (isBenchBoost) {
+                    (teamData.bench || []).forEach(p => {
+                        if (isRec || currentActualSubMode === 'pred') {
+                            benchXp += Number(p.expected_points || 0);
+                        } else {
+                            benchXp += Number(p.actual_points !== undefined ? p.actual_points : 0);
+                        }
+                    });
+                    benchXp = Math.round(benchXp * 10) / 10;
+                } else {
+                    benchXp = typeof teamData.bench_xp === 'number' ? teamData.bench_xp : 0;
+                }
+                const totalWithBench = Math.round((xiXp + benchXp) * 10) / 10;
 
                 if (isRec) {
                     titleEl.textContent = `Recommended Starting XI (${teamData.formation || '3-4-3'})`;
@@ -948,13 +985,17 @@
                     if (currentActualSubMode === 'pred') {
                         titleEl.textContent = `Actual Team — GW${gwNum} (${teamData.formation || '3-4-3'})`;
                         if (isBenchBoost) {
-                            badgeEl.textContent = `Model Projected: ${totalWithBench} pts (Hold Strategy - Bench Boost)`;
+                            badgeEl.textContent = `Model Projected: ${totalWithBench} pts (Hold Strategy - Bench Boost: XI ${xiXp} + Bench ${benchXp})`;
                         } else {
                             badgeEl.textContent = `Model Projected: ${xiXp} pts (Hold Strategy)`;
                         }
                     } else {
                         titleEl.textContent = `Actual Team — GW${gwNum} (${teamData.formation || '3-4-3'})`;
-                        badgeEl.textContent = `Actual Match Score: ${teamData.actual_total_pts || 46} pts`;
+                        if (isBenchBoost) {
+                            badgeEl.textContent = `Actual Match Score: ${totalWithBench} pts (Bench Boost: XI ${xiXp} + Bench ${benchXp})`;
+                        } else {
+                            badgeEl.textContent = `Actual Match Score: ${xiXp} pts`;
+                        }
                     }
                 }
 

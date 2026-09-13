@@ -383,14 +383,24 @@ class Orchestrator:
         chip = rec.get("chip_recommendation")
         is_bench_boost = bool(chip and any(bb in str(chip).lower() for bb in ["bboost", "bench_boost", "bench boost"]))
 
-        rec_xi_xp = rec.get("starting_xi_expected_points", 0.0)
-        rec_bench_xp = rec.get("bench_expected_points", 0.0)
+        rec_xi_xp = round(sum(
+            (p.get("simulated_points") if p.get("simulated_points") is not None else round(p.get("expected_points", 0.0) * 2, 1))
+            if p.get("is_captain")
+            else p.get("expected_points", 0.0)
+            for p in rec_xi
+        ), 1)
+        rec_bench_xp = round(sum(p.get("expected_points", 0.0) for p in rec_bench), 1) if is_bench_boost else round(rec.get("bench_expected_points", 0.0), 2)
         # Projected points only includes bench if bench boost chip is active
-        rec_total_xp = round(rec_xi_xp + rec_bench_xp, 2) if is_bench_boost else rec_xi_xp
+        rec_total_xp = round(rec_xi_xp + rec_bench_xp, 1) if is_bench_boost else rec_xi_xp
 
-        hold_xi_xp = rec.get("starting_xi_expected_points", 0.0)
-        hold_bench_xp = rec.get("bench_expected_points", 0.0)
-        hold_total_xp = round(hold_xi_xp + hold_bench_xp, 2) if is_bench_boost else hold_xi_xp
+        hold_xi_xp = round(sum(
+            (p.get("predicted_points") if p.get("predicted_points") is not None else round(p.get("expected_points", 0.0) * 2, 1))
+            if p.get("is_captain")
+            else p.get("expected_points", 0.0)
+            for p in curr_xi
+        ), 1)
+        hold_bench_xp = round(sum(p.get("expected_points", 0.0) for p in curr_bench), 1) if is_bench_boost else round(rec.get("bench_expected_points", 0.0), 2)
+        hold_total_xp = round(hold_xi_xp + hold_bench_xp, 1) if is_bench_boost else hold_xi_xp
 
         return {
             "recommended_team": {

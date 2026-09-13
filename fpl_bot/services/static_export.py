@@ -38,6 +38,8 @@ def export_static_site(output_dir: str = "dist") -> Dict[str, Any]:
     if rec:
         enriched = orchestrator.get_enriched_teams_data(rec)
         rec.update(enriched)
+        rec["starting_xi_expected_points"] = enriched["recommended_team"]["xi_xp"]
+        rec["expected_points_recommended"] = enriched["recommended_team"]["total_xp"]
     rec_file = data_path / "recommendation.json"
     with open(rec_file, "w", encoding="utf-8") as f:
         json.dump(rec or {}, f, indent=2)

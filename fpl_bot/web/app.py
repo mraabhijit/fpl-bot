@@ -52,6 +52,8 @@ async def get_latest_recommendation():
     if rec:
         enriched = orchestrator.get_enriched_teams_data(rec)
         rec.update(enriched)
+        rec["starting_xi_expected_points"] = enriched["recommended_team"]["xi_xp"]
+        rec["expected_points_recommended"] = enriched["recommended_team"]["total_xp"]
     return JSONResponse(rec or {})
 
 
@@ -62,6 +64,8 @@ async def trigger_optimization_run():
         rec_dict = rec.model_dump()
         enriched = orchestrator.get_enriched_teams_data(rec_dict)
         rec_dict.update(enriched)
+        rec_dict["starting_xi_expected_points"] = enriched["recommended_team"]["xi_xp"]
+        rec_dict["expected_points_recommended"] = enriched["recommended_team"]["total_xp"]
         return JSONResponse(rec_dict)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
