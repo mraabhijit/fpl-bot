@@ -482,9 +482,12 @@
                 <div class="value" id="val-rank">...</div>
             </div>
             <div class="stat-card" id="card-inv-league">
-                <div class="label">Invitation League</div>
+                <div class="label" style="display: flex; justify-content: space-between; align-items: center; gap: 6px;">
+                    <span style="white-space: nowrap;">Invitation League</span>
+                    <span id="val-inv-name" style="color: var(--accent-blue); text-transform: none; font-size: 11px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px;" title="">...</span>
+                </div>
                 <div class="value" id="val-inv-rank">...</div>
-                <div class="subtext" id="val-inv-name" style="color: var(--accent-blue); font-weight: 600;">...</div>
+                <div class="subtext" id="val-inv-sub">...</div>
             </div>
             <div class="stat-card">
                 <div class="label">Total Points</div>
@@ -765,23 +768,29 @@
                 
                 document.getElementById('val-rank').textContent = diag.overall_rank ? diag.overall_rank.toLocaleString() : 'N/A';
 
-                // Invitation League Rank and Name (if any)
+                // Invitation League Rank and Name
                 const invCard = document.getElementById('card-inv-league');
                 const invRankEl = document.getElementById('val-inv-rank');
                 const invNameEl = document.getElementById('val-inv-name');
+                const invSubEl = document.getElementById('val-inv-sub');
                 const invLeagues = diag.invitation_leagues || (diag.primary_invitation_league ? [diag.primary_invitation_league] : []);
                 if (invLeagues && invLeagues.length > 0) {
                     const primary = invLeagues[0];
-                    invRankEl.textContent = primary.rank !== undefined ? `Rank ${primary.rank}` : 'N/A';
-                    invNameEl.textContent = primary.name || 'Invitation League';
+                    invRankEl.textContent = primary.rank !== undefined ? primary.rank.toLocaleString() : 'N/A';
+                    invNameEl.textContent = primary.name || '';
+                    invNameEl.title = primary.name || '';
+                    
+                    let subText = primary.last_rank ? `Previous Rank: ${primary.last_rank}` : 'Classic Mini-League';
                     if (invLeagues.length > 1) {
-                        invNameEl.textContent += ` (+${invLeagues.length - 1} more)`;
-                        invNameEl.title = invLeagues.map(l => `${l.name}: Rank ${l.rank}`).join('\n');
+                        subText += ` (+${invLeagues.length - 1} more)`;
+                        if (invSubEl) invSubEl.title = invLeagues.map(l => `${l.name}: Rank ${l.rank}`).join('\n');
                     }
+                    if (invSubEl) invSubEl.textContent = subText;
                     if (invCard) invCard.style.display = 'block';
                 } else {
                     invRankEl.textContent = 'None';
-                    invNameEl.textContent = 'No invitation league';
+                    invNameEl.textContent = '';
+                    if (invSubEl) invSubEl.textContent = 'No invitation league';
                 }
 
                 document.getElementById('val-points').textContent = diag.overall_points || '0';
