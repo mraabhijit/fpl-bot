@@ -482,10 +482,7 @@
                 <div class="value" id="val-rank">...</div>
             </div>
             <div class="stat-card" id="card-inv-league">
-                <div class="label" style="display: flex; justify-content: space-between; align-items: center; gap: 6px;">
-                    <span style="white-space: nowrap;">Invitation League</span>
-                    <span id="val-inv-name" style="color: var(--accent-blue); text-transform: none; font-size: 11px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px;" title="">...</span>
-                </div>
+                <div class="label" id="val-inv-name">...</div>
                 <div class="value" id="val-inv-rank">...</div>
                 <div class="subtext" id="val-inv-sub">...</div>
             </div>
@@ -777,20 +774,20 @@
                 if (invLeagues && invLeagues.length > 0) {
                     const primary = invLeagues[0];
                     invRankEl.textContent = primary.rank !== undefined ? primary.rank.toLocaleString() : 'N/A';
-                    invNameEl.textContent = primary.name || '';
+                    invNameEl.textContent = primary.name || 'Mini-League';
                     invNameEl.title = primary.name || '';
                     
-                    let subText = primary.last_rank ? `Previous Rank: ${primary.last_rank}` : 'Classic Mini-League';
+                    let subText = primary.last_rank ? `Previous Rank: ${primary.last_rank}` : '';
                     if (invLeagues.length > 1) {
-                        subText += ` (+${invLeagues.length - 1} more)`;
+                        subText = (subText ? `${subText} • ` : '') + `+${invLeagues.length - 1} more league${invLeagues.length > 2 ? 's' : ''}`;
                         if (invSubEl) invSubEl.title = invLeagues.map(l => `${l.name}: Rank ${l.rank}`).join('\n');
                     }
                     if (invSubEl) invSubEl.textContent = subText;
                     if (invCard) invCard.style.display = 'block';
                 } else {
                     invRankEl.textContent = 'None';
-                    invNameEl.textContent = '';
-                    if (invSubEl) invSubEl.textContent = 'No invitation league';
+                    invNameEl.textContent = 'Mini-League';
+                    if (invSubEl) invSubEl.textContent = '';
                 }
 
                 document.getElementById('val-points').textContent = diag.overall_points || '0';
@@ -933,14 +930,28 @@
             const badgeEl = document.getElementById('rec-xp-badge');
 
             if (teamData) {
+                const chipRec = (currentRec && (currentRec.chip_recommendation || (currentRec.recommended_team && currentRec.recommended_team.chip_recommendation))) || '';
+                const isBenchBoost = Boolean(teamData.is_bench_boost || (chipRec && chipRec.toLowerCase().includes('boost')));
+                const xiXp = typeof teamData.xi_xp === 'number' ? teamData.xi_xp : (teamData.total_xp || 0);
+                const benchXp = typeof teamData.bench_xp === 'number' ? teamData.bench_xp : 0;
+                const totalWithBench = Math.round((xiXp + benchXp) * 100) / 100;
+
                 if (isRec) {
                     titleEl.textContent = `Recommended Starting XI (${teamData.formation || '3-4-3'})`;
-                    badgeEl.textContent = `Projected XP: ${teamData.total_xp} pts (XI: ${teamData.xi_xp} + Bench: ${teamData.bench_xp})`;
+                    if (isBenchBoost) {
+                        badgeEl.textContent = `Projected XP: ${totalWithBench} pts (Bench Boost: XI ${xiXp} + Bench ${benchXp})`;
+                    } else {
+                        badgeEl.textContent = `Projected XP: ${xiXp} pts`;
+                    }
                 } else {
                     const gwNum = teamData.gameweek || 4;
                     if (currentActualSubMode === 'pred') {
                         titleEl.textContent = `Actual Team — GW${gwNum} (${teamData.formation || '3-4-3'})`;
-                        badgeEl.textContent = `Model Projected: ${teamData.total_xp} pts (Hold Strategy)`;
+                        if (isBenchBoost) {
+                            badgeEl.textContent = `Model Projected: ${totalWithBench} pts (Hold Strategy - Bench Boost)`;
+                        } else {
+                            badgeEl.textContent = `Model Projected: ${xiXp} pts (Hold Strategy)`;
+                        }
                     } else {
                         titleEl.textContent = `Actual Team — GW${gwNum} (${teamData.formation || '3-4-3'})`;
                         badgeEl.textContent = `Actual Match Score: ${teamData.actual_total_pts || 46} pts`;

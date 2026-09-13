@@ -67,9 +67,12 @@ def run_optimization():
 
     print("============================================================")
     print(f"GW{rec.gameweek} RECOMMENDATION SUMMARY")
-    print(f"Total 15-Player Squad Projected XP: {rec.expected_points_recommended:.1f} pts (Hold: {rec.expected_points_hold:.1f} pts)")
-    print(f"  • Starting XI Base + Captaincy:   {rec.starting_xi_expected_points:.1f} pts")
-    print(f"  • Bench Autosub Coverage Value:   {rec.bench_expected_points:.1f} pts")
+    is_bb = bool(rec.chip_recommendation and "boost" in str(rec.chip_recommendation).lower())
+    proj_pts = (rec.starting_xi_expected_points + rec.bench_expected_points) if is_bb else rec.starting_xi_expected_points
+    if is_bb:
+        print(f"Projected XP: {proj_pts:.1f} pts (Bench Boost: XI {rec.starting_xi_expected_points:.1f} + Bench {rec.bench_expected_points:.1f})")
+    else:
+        print(f"Projected XP: {proj_pts:.1f} pts")
     print(f"Net Gain: +{rec.expected_net_gain:.1f} pts | Hit Cost: -{rec.hit_cost} pts")
     
     cap_p = players_map.get(rec.captain_id)

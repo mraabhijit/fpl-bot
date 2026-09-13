@@ -380,19 +380,35 @@ class Orchestrator:
         curr_formation = f"{curr_d}-{curr_m}-{curr_f}"
         curr_actual_total = sum(p.get("actual_points", 0) for p in curr_xi)
 
+        chip = rec.get("chip_recommendation")
+        is_bench_boost = bool(chip and any(bb in str(chip).lower() for bb in ["bboost", "bench_boost", "bench boost"]))
+
+        rec_xi_xp = rec.get("starting_xi_expected_points", 0.0)
+        rec_bench_xp = rec.get("bench_expected_points", 0.0)
+        # Projected points only includes bench if bench boost chip is active
+        rec_total_xp = round(rec_xi_xp + rec_bench_xp, 2) if is_bench_boost else rec_xi_xp
+
+        hold_xi_xp = rec.get("starting_xi_expected_points", 0.0)
+        hold_bench_xp = rec.get("bench_expected_points", 0.0)
+        hold_total_xp = round(hold_xi_xp + hold_bench_xp, 2) if is_bench_boost else hold_xi_xp
+
         return {
             "recommended_team": {
                 "formation": rec_formation,
-                "total_xp": rec.get("expected_points_recommended", 0.0),
-                "xi_xp": rec.get("starting_xi_expected_points", 0.0),
-                "bench_xp": rec.get("bench_expected_points", 0.0),
+                "total_xp": rec_total_xp,
+                "xi_xp": rec_xi_xp,
+                "bench_xp": rec_bench_xp,
+                "is_bench_boost": is_bench_boost,
                 "starting_xi": rec_xi,
                 "bench": rec_bench
             },
             "current_team": {
                 "formation": curr_formation,
                 "gameweek": squad_gw,
-                "total_xp": rec.get("expected_points_hold", 0.0),
+                "total_xp": hold_total_xp,
+                "xi_xp": hold_xi_xp,
+                "bench_xp": hold_bench_xp,
+                "is_bench_boost": is_bench_boost,
                 "actual_total_pts": curr_actual_total,
                 "starting_xi": curr_xi,
                 "bench": curr_bench
