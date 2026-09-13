@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fpl-bot"
+version = "0.1.0"
+description = "Autonomous Fantasy Premier League Optimizer"
+readme = "FPL-Optimizer.md"
+requires-python = ">=3.12"
+dependencies = [
+    "httpx>=0.28.0",
+    "pydantic>=2.10.0",
+    "pydantic-settings>=2.8.0",
+    "fastapi>=0.115.0",
+    "uvicorn>=0.34.0",
+    "apscheduler>=3.11.0",
+    "python-dotenv>=1.0.0",
+    "rich>=13.9.0",
+]
+
+[project.scripts]
+fpl-bot = "fpl_bot.cli:main"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

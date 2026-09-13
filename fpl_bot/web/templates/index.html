@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Autonomous FPL Optimizer — Overspent FC</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-card: #21262d;
+            --border-color: #30363d;
+            --text-primary: #f0f6fc;
+            --text-secondary: #8b949e;
+            --pl-purple: #37003c;
+            --pl-green: #00ff87;
+            --accent-blue: #58a6ff;
+            --accent-red: #f85149;
+            --accent-yellow: #d29922;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 24px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 24px;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 24px;
+        }
+
+        .brand h1 {
+            font-size: 26px;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--pl-green), #00d2ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .brand p {
+            color: var(--text-secondary);
+            font-size: 14px;
+            margin-top: 4px;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .badge {
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        .badge-mode {
+            background-color: rgba(210, 153, 34, 0.2);
+            color: var(--accent-yellow);
+            border: 1px solid var(--accent-yellow);
+        }
+
+        .badge-live {
+            background-color: rgba(0, 255, 135, 0.2);
+            color: var(--pl-green);
+            border: 1px solid var(--pl-green);
+        }
+
+        .btn {
+            background-color: var(--bg-card);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn:hover {
+            background-color: #30363d;
+            border-color: #8b949e;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #00ff87, #00b4d8);
+            color: #0d1117;
+            border: none;
+            font-weight: 700;
+        }
+
+        .btn-primary:hover {
+            opacity: 0.9;
+        }
+
+        .btn-danger {
+            background-color: rgba(248, 81, 73, 0.2);
+            color: var(--accent-red);
+            border: 1px solid var(--accent-red);
+        }
+
+        .btn-danger:hover {
+            background-color: var(--accent-red);
+            color: white;
+        }
+
+        .grid-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .stat-card .label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .stat-card .value {
+            font-size: 28px;
+            font-weight: 800;
+            margin-top: 8px;
+            color: var(--text-primary);
+        }
+
+        .stat-card .subtext {
+            font-size: 12px;
+            color: var(--pl-green);
+            margin-top: 4px;
+        }
+
+        /* Approvals banner */
+        .approval-card {
+            background: linear-gradient(135deg, rgba(210, 153, 34, 0.15), rgba(22, 27, 34, 0.8));
+            border: 2px solid var(--accent-yellow);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+            animation: pulseGlow 3s infinite alternate;
+        }
+
+        @keyframes pulseGlow {
+            0% { border-color: rgba(210, 153, 34, 0.4); }
+            100% { border-color: rgba(210, 153, 34, 1.0); }
+        }
+
+        .approval-card h2 {
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--accent-yellow);
+            margin-bottom: 12px;
+        }
+
+        .approval-content {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+        }
+
+        .reasons-list {
+            list-style: none;
+            margin-top: 8px;
+        }
+
+        .reasons-list li {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+            padding-left: 16px;
+            position: relative;
+        }
+
+        .reasons-list li::before {
+            content: "•";
+            color: var(--pl-green);
+            position: absolute;
+            left: 0;
+            font-weight: bold;
+        }
+
+        .approval-actions {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 12px;
+        }
+
+        .main-layout {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 24px;
+        }
+
+        .section-card {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+
+        .section-card h3 {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        /* Lineup Pitch / Player Grid */
+        .pitch-container {
+            background: radial-gradient(circle at center, #1b382b 0%, #0d2017 100%);
+            border-radius: 12px;
+            padding: 24px;
+            border: 1px solid rgba(0, 255, 135, 0.2);
+        }
+
+        .lineup-row {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 20px;
+        }
+
+        .player-card {
+            background: rgba(22, 27, 34, 0.9);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 8px 12px;
+            text-align: center;
+            min-width: 110px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            position: relative;
+        }
+
+        .player-card .p-name {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .player-card .p-team {
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        .player-card .p-cost {
+            font-size: 11px;
+            color: var(--pl-green);
+            font-weight: 600;
+        }
+
+        .badge-captain {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: #00ff87;
+            color: #000;
+            font-size: 10px;
+            font-weight: 800;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .badge-vice {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: #58a6ff;
+            color: #000;
+            font-size: 10px;
+            font-weight: 800;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .bench-row {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            background-color: var(--bg-card);
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 16px;
+        }
+
+        /* Transfers & Audit Table */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            color: var(--text-secondary);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 11px;
+        }
+
+        pre {
+            background-color: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 14px;
+            font-family: monospace;
+            font-size: 12px;
+            color: var(--pl-green);
+            overflow-x: auto;
+        }
+
+        .tag-success {
+            color: var(--pl-green);
+            font-weight: 700;
+        }
+
+        .tag-danger {
+            color: var(--accent-red);
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="brand">
+                <h1>⚡ Overspent FC Optimizer</h1>
+                <p>Team ID: 6834344 • 2026/27 • Autonomous Expected Points Maximizer (Asia/Kolkata)</p>
+            </div>
+            <div class="header-actions">
+                <span id="mode-badge" class="badge badge-mode">DRY RUN MODE</span>
+                <button class="btn" onclick="openDiagnosticModal()">🔍 Diagnostic</button>
+                <button class="btn btn-primary" onclick="triggerOptimization()">🚀 Run Optimizer</button>
+            </div>
+        </header>
+
+        <!-- Stats Overview -->
+        <div class="grid-stats">
+            <div class="stat-card">
+                <div class="label">Overall Rank</div>
+                <div class="value" id="val-rank">...</div>
+                <div class="subtext" id="sub-rank">Percentile: ...</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Total Points</div>
+                <div class="value" id="val-points">...</div>
+                <div class="subtext">2026/27 Live</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Bank / Squad Value</div>
+                <div class="value" id="val-funds">...</div>
+                <div class="subtext" id="val-ft">Free Transfers: ...</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Upcoming Deadline</div>
+                <div class="value" style="font-size: 20px;" id="val-deadline">...</div>
+                <div class="subtext" id="val-countdown">Primary run: T-3h</div>
+            </div>
+        </div>
+
+        <!-- Approval Card (Dynamically Rendered if action requires approval) -->
+        <div id="approval-box" style="display: none;" class="approval-card">
+            <h2>⚠️ <span id="approval-title">ACTION REQUIRED</span></h2>
+            <div class="approval-content">
+                <div>
+                    <div style="font-size: 14px; font-weight: 700;" id="approval-action-text">Proposed Transfer / Chip</div>
+                    <ul class="reasons-list" id="approval-reasons"></ul>
+                    <div style="font-size: 12px; color: var(--text-secondary); margin-top: 8px;">
+                        Risk: <span id="approval-risk">None</span>
+                    </div>
+                </div>
+                <div class="approval-actions">
+                    <button class="btn btn-primary" onclick="respondApproval('APPROVE')">✅ Approve [YES]</button>
+                    <button class="btn btn-danger" onclick="respondApproval('REJECT')">❌ Reject [NO]</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Routine Status Banner if Auto Allowed -->
+        <div id="routine-banner" style="display: none; background: rgba(0, 255, 135, 0.1); border: 1px solid var(--pl-green); border-radius: 8px; padding: 12px 16px; margin-bottom: 24px; font-size: 13px; color: var(--pl-green);">
+            🛡️ Routine actions (lineup, captaincy, free transfer) automatically verified by Deadline Auditor.
+        </div>
+
+        <div class="main-layout">
+            <!-- Left Column: Starting XI and Bench -->
+            <div>
+                <div class="section-card">
+                    <h3>
+                        <span>Recommended XI & Formation</span>
+                        <span id="rec-xp-badge" style="font-size: 13px; color: var(--pl-green);">Projected XP: ...</span>
+                    </h3>
+                    <div class="pitch-container" id="pitch">
+                        <!-- Dynamic Player Rows -->
+                        <div class="lineup-row" id="row-gkp"></div>
+                        <div class="lineup-row" id="row-def"></div>
+                        <div class="lineup-row" id="row-mid"></div>
+                        <div class="lineup-row" id="row-fwd"></div>
+                    </div>
+                    <div class="bench-row" id="bench-container">
+                        <!-- Dynamic Bench -->
+                    </div>
+                </div>
+
+                <!-- Backtest Results -->
+                <div class="section-card">
+                    <h3>
+                        <span>Historical Backtesting Engine (GW1 - GW4)</span>
+                        <button class="btn" style="padding: 4px 10px; font-size: 12px;" onclick="runBacktest()">Run Backtest</button>
+                    </h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>GW</th>
+                                <th>Projected XP</th>
+                                <th>Optimized Actual</th>
+                                <th>Original Actual</th>
+                                <th>Delta</th>
+                                <th>Captain Success</th>
+                                <th>Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody id="backtest-table-body">
+                            <tr><td colspan="7" style="color: var(--text-secondary); text-align: center;">Click "Run Backtest" to evaluate historical strategy without data leakage.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Right Column: Proposed Transfers, Chip Advisory, Audit Logs -->
+            <div>
+                <div class="section-card">
+                    <h3>Strategic Transfers</h3>
+                    <div id="transfers-view" style="font-size: 13px;">
+                        <p style="color: var(--text-secondary);">Loading recommendation...</p>
+                    </div>
+                </div>
+
+                <div class="section-card">
+                    <h3>Chip Advisory</h3>
+                    <div id="chip-advisory" style="font-size: 13px;">
+                        <p style="color: var(--text-secondary);">Evaluating chips for remaining season...</p>
+                    </div>
+                </div>
+
+                <div class="section-card">
+                    <h3>Audit Trail</h3>
+                    <div style="max-height: 260px; overflow-y: auto;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Event</th>
+                                    <th>Result</th>
+                                    <th>Time</th>
+                                </tr>
+                            </thead>
+                            <tbody id="audit-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Diagnostic Modal -->
+    <div id="diag-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); z-index: 1000; align-items: center; justify-content: center;">
+        <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 24px; max-width: 700px; width: 90%; max-height: 80vh; overflow-y: auto;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <h3 style="color: var(--pl-green);">System Diagnostic (Section 28)</h3>
+                <button class="btn" onclick="closeDiagnosticModal()">Close</button>
+            </div>
+            <pre id="diag-content">Running diagnostic...</pre>
+        </div>
+    </div>
+
+    <script>
+        let currentRec = null;
+
+        async function loadData() {
+            try {
+                const diagRes = await fetch('/api/diagnostic');
+                const diag = await diagRes.json();
+                
+                document.getElementById('val-rank').textContent = diag.overall_rank ? diag.overall_rank.toLocaleString() : 'N/A';
+                document.getElementById('val-points').textContent = diag.overall_points || '0';
+                document.getElementById('val-funds').textContent = `${diag.bank} in Bank / ${diag.team_value}`;
+                document.getElementById('val-ft').textContent = `Free Transfers: ${diag.free_transfers}`;
+                document.getElementById('val-deadline').textContent = diag.deadline;
+
+                // Load recommendation
+                const recRes = await fetch('/api/recommendation');
+                currentRec = await recRes.json();
+                renderRecommendation(currentRec, diag);
+
+                // Load audits
+                loadAudits();
+                loadBacktests();
+            } catch (err) {
+                console.error("Failed loading data:", err);
+            }
+        }
+
+        function renderRecommendation(rec, diag) {
+            if (!rec || !rec.starting_xi) return;
+
+            document.getElementById('rec-xp-badge').textContent = `Projected XP: ${rec.expected_points_recommended} pts (Hold: ${rec.expected_points_hold} pts)`;
+
+            // Check approval requirements
+            const approvalBox = document.getElementById('approval-box');
+            const routineBanner = document.getElementById('routine-banner');
+
+            if (rec.approval_required && rec.approval_status === 'PENDING') {
+                approvalBox.style.display = 'block';
+                routineBanner.style.display = 'none';
+                document.getElementById('approval-title').textContent = rec.chip_recommendation ? 'CHIP APPROVAL REQUIRED' : 'ACTION REQUIRED';
+                document.getElementById('approval-action-text').textContent = rec.chip_recommendation ? `Activate Chip: ${rec.chip_recommendation.toUpperCase()}` : `Take Hit: -${rec.hit_cost} Points`;
+                
+                const ul = document.getElementById('approval-reasons');
+                ul.innerHTML = '';
+                (rec.reasons || []).forEach(r => {
+                    const li = document.createElement('li');
+                    li.textContent = r;
+                    ul.appendChild(li);
+                });
+                document.getElementById('approval-risk').textContent = rec.risk_assessment || 'Standard variance';
+            } else {
+                approvalBox.style.display = 'none';
+                routineBanner.style.display = 'block';
+            }
+
+            // Transfers view
+            const tView = document.getElementById('transfers-view');
+            if (rec.transfers_in && rec.transfers_in.length > 0) {
+                tView.innerHTML = `
+                    <div style="margin-bottom: 8px;">
+                        <span class="tag-danger">OUT:</span> Player #${rec.transfers_out.join(', ')}<br>
+                        <span class="tag-success">IN:</span> Player #${rec.transfers_in.join(', ')}
+                    </div>
+                    <div style="font-size: 12px; color: var(--text-secondary);">
+                        Net expected gain: +${rec.expected_net_gain} pts<br>
+                        Cost: -${rec.hit_cost} pts
+                    </div>
+                `;
+            } else {
+                tView.innerHTML = `<p style="color: var(--text-secondary);">No transfers recommended this round (Squad hold produces superior long-term expected value).</p>`;
+            }
+
+            // Chip view
+            const cView = document.getElementById('chip-advisory');
+            if (rec.chip_recommendation) {
+                cView.innerHTML = `<div style="color: var(--accent-yellow); font-weight: 700;">Recommended: ${rec.chip_recommendation.toUpperCase()}</div>`;
+            } else {
+                cView.innerHTML = `<p style="color: var(--text-secondary);">Save chips. No high-leverage DGW or extreme fixture swing detected for GW${rec.gameweek}.</p>`;
+            }
+
+            renderPitch(diag);
+        }
+
+        function renderPitch(diag) {
+            const rowGkp = document.getElementById('row-gkp');
+            const rowDef = document.getElementById('row-def');
+            const rowMid = document.getElementById('row-mid');
+            const rowFwd = document.getElementById('row-fwd');
+            const bench = document.getElementById('bench-container');
+
+            rowGkp.innerHTML = '';
+            rowDef.innerHTML = '';
+            rowMid.innerHTML = '';
+            rowFwd.innerHTML = '';
+            bench.innerHTML = '';
+
+            (diag.current_xi || []).forEach(str => {
+                const card = createPlayerCard(str, diag.captain, diag.vice_captain);
+                if (str.includes('GKP')) rowGkp.appendChild(card);
+                else if (str.includes('DEF')) rowDef.appendChild(card);
+                else if (str.includes('MID')) rowMid.appendChild(card);
+                else if (str.includes('FWD')) rowFwd.appendChild(card);
+            });
+
+            (diag.bench || []).forEach(str => {
+                const card = createPlayerCard(str, null, null);
+                bench.appendChild(card);
+            });
+        }
+
+        function createPlayerCard(infoStr, captainStr, viceStr) {
+            const div = document.createElement('div');
+            div.className = 'player-card';
+
+            const isCap = captainStr && infoStr.includes(captainStr.split(' ')[0]);
+            const isVice = viceStr && infoStr.includes(viceStr.split(' ')[0]);
+
+            div.innerHTML = `
+                ${isCap ? '<div class="badge-captain">C</div>' : ''}
+                ${isVice ? '<div class="badge-vice">V</div>' : ''}
+                <div class="p-name">${infoStr.split(' ')[2] || 'Player'}</div>
+                <div class="p-team">${infoStr.split(' ')[3] || ''}</div>
+                <div class="p-cost">${infoStr.split(' ')[4] || ''}</div>
+            `;
+            return div;
+        }
+
+        async function loadAudits() {
+            try {
+                const res = await fetch('/api/audits?limit=8');
+                const logs = await res.json();
+                const tbody = document.getElementById('audit-table-body');
+                tbody.innerHTML = '';
+                logs.forEach(l => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td style="font-weight: 600;">${l.event_type}</td>
+                        <td class="${l.result === 'SUCCESS' || l.result === 'APPROVED' ? 'tag-success' : ''}">${l.result}</td>
+                        <td style="color: var(--text-secondary); font-size: 11px;">${l.timestamp.split(' ')[1] || l.timestamp}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (e) {}
+        }
+
+        async function loadBacktests() {
+            try {
+                const res = await fetch('/api/backtests');
+                const rows = await res.json();
+                const tbody = document.getElementById('backtest-table-body');
+                if (rows.length > 0) tbody.innerHTML = '';
+                rows.forEach(r => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>GW${r.gameweek}</td>
+                        <td>${r.projected_points.toFixed(1)}</td>
+                        <td><strong>${r.actual_points}</strong></td>
+                        <td>${r.hold_actual_points}</td>
+                        <td class="${r.transfer_delta >= 0 ? 'tag-success' : 'tag-danger'}">${r.transfer_delta >= 0 ? '+' : ''}${r.transfer_delta}</td>
+                        <td>${r.captain_success ? '✅ Yes' : '⚠️ No'}</td>
+                        <td style="color: var(--text-secondary);">${r.notes}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (e) {}
+        }
+
+        async function runBacktest() {
+            const tbody = document.getElementById('backtest-table-body');
+            tbody.innerHTML = `<tr><td colspan="7" style="color: var(--pl-green); text-align: center;">Running historical backtesting simulation...</td></tr>`;
+            await fetch('/api/backtests/run', { method: 'POST' });
+            loadBacktests();
+            loadAudits();
+        }
+
+        async function respondApproval(decision) {
+            if (!currentRec) return;
+            await fetch('/api/approval', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    recommendation_id: currentRec.id,
+                    decision: decision
+                })
+            });
+            loadData();
+        }
+
+        async function triggerOptimization() {
+            await fetch('/api/recommendation/run', { method: 'POST' });
+            loadData();
+        }
+
+        async function openDiagnosticModal() {
+            const modal = document.getElementById('diag-modal');
+            modal.style.display = 'flex';
+            const res = await fetch('/api/diagnostic');
+            const data = await res.json();
+            document.getElementById('diag-content').textContent = JSON.stringify(data, null, 2);
+        }
+
+        function closeDiagnosticModal() {
+            document.getElementById('diag-modal').style.display = 'none';
+        }
+
+        // Auto load
+        loadData();
+        setInterval(loadAudits, 15000);
+    </script>
+</body>
+</html>
