@@ -124,7 +124,7 @@ class BacktestingEngine:
         result = BacktestResult(
             gameweek=gameweek,
             projected_points=rec.expected_points_recommended,
-            actual_points=int(rec_starting_pts),
+            actual_points=int(rec_actual_total_pts),
             hold_actual_points=actual_points,
             transfer_delta=transfer_delta,
             captain_actual_points=rec_captain_pts,
@@ -133,7 +133,7 @@ class BacktestingEngine:
             captain_success=captain_success,
             hit_points_cost=rec.hit_cost,
             hit_points_gain=max(0, transfer_delta),
-            notes=f"Optimized XI scored {rec_starting_pts} pts vs actual {actual_points} pts (Delta: {transfer_delta:+d} pts)"
+            notes=f"Optimized squad scored {rec_actual_total_pts} pts vs actual {actual_points} pts (Delta: {transfer_delta:+d} pts)"
         )
 
         # Save to SQLite
