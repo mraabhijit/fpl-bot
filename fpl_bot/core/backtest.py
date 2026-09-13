@@ -57,13 +57,61 @@ class BacktestingEngine:
             availabilities=availabilities
         )
 
-        # 4. Evaluate actual points that the recommended team would have earned
-        rec_captain_pts = live_elements.get(rec.captain_id, {}).get("total_points", 0)
-        rec_vice_pts = live_elements.get(rec.vice_captain_id, {}).get("total_points", 0)
+        # 4. Evaluate actual points that the recommended team would have earned (including autosubs)
+        starter_mins = {pid: live_elements.get(pid, {}).get("minutes", 0) for pid in rec.starting_xi}
+        starter_pts = {pid: live_elements.get(pid, {}).get("total_points", 0) for pid in rec.starting_xi}
+        
+        # Captaincy resolution
+        cap_mins = starter_mins.get(rec.captain_id, 0)
+        rec_captain_pts = starter_pts.get(rec.captain_id, 0)
+        rec_vice_pts = starter_pts.get(rec.vice_captain_id, 0)
+        
+        effective_captain_bonus = rec_captain_pts if cap_mins > 0 else (rec_vice_pts if starter_mins.get(rec.vice_captain_id, 0) > 0 else 0)
 
-        rec_starting_pts = sum(
-            live_elements.get(pid, {}).get("total_points", 0) for pid in rec.starting_xi
-        ) + rec_captain_pts  # Captain doubles
+        # Goalkeeper substitution
+        starting_gk = next(pid for pid in rec.starting_xi if players_map[pid].element_type == 1)
+        bench_gk = rec.bench_order[0]
+        actual_gk_pts = starter_pts[starting_gk]
+        if starter_mins[starting_gk] == 0 and live_elements.get(bench_gk, {}).get("minutes", 0) > 0:
+            actual_gk_pts = live_elements.get(bench_gk, {}).get("total_points", 0)
+
+        # Outfield substitutions
+        outfield_starters = [pid for pid in rec.starting_xi if players_map[pid].element_type != 1]
+        active_counts = {
+            2: sum(1 for pid in outfield_starters if starter_mins[pid] > 0 and players_map[pid].element_type == 2),
+            3: sum(1 for pid in outfield_starters if starter_mins[pid] > 0 and players_map[pid].element_type == 3),
+            4: sum(1 for pid in outfield_starters if starter_mins[pid] > 0 and players_map[pid].element_type == 4),
+        }
+        
+        missing_outfield_count = sum(1 for pid in outfield_starters if starter_mins[pid] == 0)
+        bench_outfield = rec.bench_order[1:]  # [sub1, sub2, sub3]
+        autosub_pts = 0
+        
+        if missing_outfield_count > 0:
+            slots_to_fill = missing_outfield_count
+            for s_idx, sub_id in enumerate(bench_outfield):
+                if slots_to_fill <= 0:
+                    break
+                sub_min = live_elements.get(sub_id, {}).get("minutes", 0)
+                if sub_min > 0:
+                    sub_pos = players_map[sub_id].element_type
+                    d_new = active_counts[2] + (1 if sub_pos == 2 else 0)
+                    m_new = active_counts[3] + (1 if sub_pos == 3 else 0)
+                    f_new = active_counts[4] + (1 if sub_pos == 4 else 0)
+                    
+                    if d_new <= 5 and m_new <= 5 and f_new <= 3:
+                        rem_bench_pos = [players_map[b].element_type for b in bench_outfield[s_idx+1:]]
+                        avail_d = sum(1 for p in rem_bench_pos if p == 2)
+                        avail_m = sum(1 for p in rem_bench_pos if p == 3)
+                        avail_f = sum(1 for p in rem_bench_pos if p == 4)
+                        if (d_new + avail_d >= 3) and (m_new + avail_m >= 2) and (f_new + avail_f >= 1):
+                            # Sub comes on!
+                            autosub_pts += live_elements.get(sub_id, {}).get("total_points", 0)
+                            active_counts[sub_pos] += 1
+                            slots_to_fill -= 1
+
+        outfield_pts = sum(starter_pts[pid] for pid in outfield_starters if starter_mins[pid] > 0)
+        rec_actual_total_pts = actual_gk_pts + outfield_pts + autosub_pts + effective_captain_bonus
 
         # Actual captain points
         actual_captain_pick = next((p for p in actual_picks_data.get("picks", []) if p.get("is_captain")), None)
@@ -71,7 +119,7 @@ class BacktestingEngine:
         actual_cap_pts = live_elements.get(actual_captain_id, {}).get("total_points", 0) if actual_captain_id else 0
 
         captain_success = (rec_captain_pts >= actual_cap_pts)
-        transfer_delta = int(rec_starting_pts - actual_points)
+        transfer_delta = int(rec_actual_total_pts - actual_points)
 
         result = BacktestResult(
             gameweek=gameweek,

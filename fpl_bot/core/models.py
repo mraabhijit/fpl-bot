@@ -175,6 +175,9 @@ class Recommendation(BaseModel):
     hit_cost: int = 0
     expected_points_hold: float = 0.0
     expected_points_recommended: float = 0.0
+    starting_xi_expected_points: float = 0.0
+    bench_expected_points: float = 0.0
+    bench_autosub_probabilities: Dict[int, float] = Field(default_factory=dict)
     expected_net_gain: float = 0.0
     reasons: List[str] = Field(default_factory=list)
     risk_assessment: str = ""

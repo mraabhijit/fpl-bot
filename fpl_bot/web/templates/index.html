@@ -605,10 +605,10 @@
                 cView.innerHTML = `<p style="color: var(--text-secondary);">Save chips. No high-leverage DGW or extreme fixture swing detected for GW${rec.gameweek}.</p>`;
             }
 
-            renderPitch(diag);
+            renderPitch(diag, rec);
         }
 
-        function renderPitch(diag) {
+        function renderPitch(diag, rec) {
             const rowGkp = document.getElementById('row-gkp');
             const rowDef = document.getElementById('row-def');
             const rowMid = document.getElementById('row-mid');
@@ -622,20 +622,33 @@
             bench.innerHTML = '';
 
             (diag.current_xi || []).forEach(str => {
-                const card = createPlayerCard(str, diag.captain, diag.vice_captain);
+                const card = createPlayerCard(str, diag.captain, diag.vice_captain, null);
                 if (str.includes('GKP')) rowGkp.appendChild(card);
                 else if (str.includes('DEF')) rowDef.appendChild(card);
                 else if (str.includes('MID')) rowMid.appendChild(card);
                 else if (str.includes('FWD')) rowFwd.appendChild(card);
             });
 
-            (diag.bench || []).forEach(str => {
-                const card = createPlayerCard(str, null, null);
+            // Render bench with subs sequence priority and autosub probabilities
+            const subLabels = ['GK Sub', 'Sub 1', 'Sub 2', 'Sub 3'];
+            const subProbs = rec ? (rec.bench_autosub_probabilities || {}) : {};
+
+            (diag.bench || []).forEach((str, idx) => {
+                const label = subLabels[idx] || `Sub ${idx}`;
+                // Match element ID if possible or approximate
+                let probText = '';
+                if (rec && rec.bench_order && rec.bench_order[idx]) {
+                    const pId = rec.bench_order[idx];
+                    if (subProbs[pId] !== undefined) {
+                        probText = `Autosub: ${(subProbs[pId] * 100).toFixed(1)}%`;
+                    }
+                }
+                const card = createPlayerCard(str, null, null, label, probText);
                 bench.appendChild(card);
             });
         }
 
-        function createPlayerCard(infoStr, captainStr, viceStr) {
+        function createPlayerCard(infoStr, captainStr, viceStr, subBadge, subProb) {
             const div = document.createElement('div');
             div.className = 'player-card';
 
@@ -645,9 +658,11 @@
             div.innerHTML = `
                 ${isCap ? '<div class="badge-captain">C</div>' : ''}
                 ${isVice ? '<div class="badge-vice">V</div>' : ''}
+                ${subBadge ? `<div style="font-size: 10px; font-weight: 800; color: var(--accent-yellow); margin-bottom: 2px;">${subBadge}</div>` : ''}
                 <div class="p-name">${infoStr.split(' ')[2] || 'Player'}</div>
                 <div class="p-team">${infoStr.split(' ')[3] || ''}</div>
                 <div class="p-cost">${infoStr.split(' ')[4] || ''}</div>
+                ${subProb ? `<div style="font-size: 10px; color: var(--pl-green); margin-top: 4px; font-weight: 600;">${subProb}</div>` : ''}
             `;
             return div;
         }

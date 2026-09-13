@@ -162,6 +162,9 @@ class Database:
                 hit_cost INTEGER DEFAULT 0,
                 expected_points_hold REAL,
                 expected_points_recommended REAL,
+                starting_xi_expected_points REAL DEFAULT 0.0,
+                bench_expected_points REAL DEFAULT 0.0,
+                bench_autosub_probabilities TEXT,
                 expected_net_gain REAL,
                 reasons TEXT,
                 risk_assessment TEXT,
@@ -172,6 +175,17 @@ class Database:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
             """)
+
+            # Safe column migration for recommendations
+            for col_def in [
+                ("starting_xi_expected_points", "REAL DEFAULT 0.0"),
+                ("bench_expected_points", "REAL DEFAULT 0.0"),
+                ("bench_autosub_probabilities", "TEXT")
+            ]:
+                try:
+                    cursor.execute(f"ALTER TABLE recommendations ADD COLUMN {col_def[0]} {col_def[1]}")
+                except sqlite3.OperationalError:
+                    pass
 
             # Approvals
             cursor.execute("""
@@ -311,10 +325,11 @@ class Database:
             INSERT INTO recommendations (
                 gameweek, transfers_in, transfers_out, starting_xi, bench_order,
                 captain_id, vice_captain_id, chip_recommendation, hit_count, hit_cost,
-                expected_points_hold, expected_points_recommended, expected_net_gain,
+                expected_points_hold, expected_points_recommended, starting_xi_expected_points,
+                bench_expected_points, bench_autosub_probabilities, expected_net_gain,
                 reasons, risk_assessment, approval_required, approval_status, execution_status,
                 transaction_hash
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 rec.get("gameweek"),
                 json.dumps(rec.get("transfers_in", [])),
@@ -328,6 +343,9 @@ class Database:
                 rec.get("hit_cost", 0),
                 rec.get("expected_points_hold", 0.0),
                 rec.get("expected_points_recommended", 0.0),
+                rec.get("starting_xi_expected_points", 0.0),
+                rec.get("bench_expected_points", 0.0),
+                json.dumps(rec.get("bench_autosub_probabilities", {})),
                 rec.get("expected_net_gain", 0.0),
                 json.dumps(rec.get("reasons", [])),
                 rec.get("risk_assessment", ""),
@@ -356,6 +374,7 @@ class Database:
             res["starting_xi"] = json.loads(res["starting_xi"] or "[]")
             res["bench_order"] = json.loads(res["bench_order"] or "[]")
             res["reasons"] = json.loads(res["reasons"] or "[]")
+            res["bench_autosub_probabilities"] = json.loads(res.get("bench_autosub_probabilities") or "{}")
             return res
 
     def update_recommendation_status(self, rec_id: int, approval_status: str, execution_status: Optional[str] = None):

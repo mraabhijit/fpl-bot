@@ -57,24 +57,52 @@ def run_diagnostic():
 def run_optimization():
     print("Running strategic FPL optimization cycle...")
     rec = orchestrator.run_optimization_cycle()
+    players_map, _, _ = orchestrator.player_data.get_all_players_and_teams()
+
     print("============================================================")
     print(f"GW{rec.gameweek} RECOMMENDATION SUMMARY")
-    print(f"Projected Points: {rec.expected_points_recommended:.1f} pts (Hold: {rec.expected_points_hold:.1f} pts)")
+    print(f"Total 15-Player Squad Projected XP: {rec.expected_points_recommended:.1f} pts (Hold: {rec.expected_points_hold:.1f} pts)")
+    print(f"  • Starting XI Base + Captaincy:   {rec.starting_xi_expected_points:.1f} pts")
+    print(f"  • Bench Autosub Coverage Value:   {rec.bench_expected_points:.1f} pts")
     print(f"Net Gain: +{rec.expected_net_gain:.1f} pts | Hit Cost: -{rec.hit_cost} pts")
-    print(f"Captain ID: {rec.captain_id} | Vice ID: {rec.vice_captain_id}")
-    print(f"Starting XI: {rec.starting_xi}")
-    print(f"Bench Order: {rec.bench_order}")
+    
+    cap_p = players_map.get(rec.captain_id)
+    vice_p = players_map.get(rec.vice_captain_id)
+    print(f"Captain: {cap_p.web_name if cap_p else rec.captain_id} ({cap_p.team_short_name if cap_p else ''}) | Vice: {vice_p.web_name if vice_p else rec.vice_captain_id} ({vice_p.team_short_name if vice_p else ''})")
+    
+    print("\nStarting XI:")
+    for idx, pid in enumerate(rec.starting_xi, start=1):
+        p = players_map.get(pid)
+        c_badge = " (C)" if pid == rec.captain_id else (" (V)" if pid == rec.vice_captain_id else "")
+        print(f"  {idx:2d}. {p.position_name} {p.web_name} ({p.team_short_name}) £{p.now_cost/10:.1f}m{c_badge}")
+
+    print("\nSubs Lineup Sequence (Formation Legality & Priority Optimized):")
+    # Pos 12: GK Sub
+    gk_sub = players_map.get(rec.bench_order[0]) if rec.bench_order else None
+    gk_prob = rec.bench_autosub_probabilities.get(rec.bench_order[0], 0.0) * 100
+    print(f"  Slot 12 [GK Sub]: {gk_sub.web_name} ({gk_sub.team_short_name}) £{gk_sub.now_cost/10:.1f}m (Autosub Prob: {gk_prob:.1f}%)")
+    
+    # Pos 13, 14, 15: Outfield Subs
+    for s_idx, pid in enumerate(rec.bench_order[1:], start=1):
+        p = players_map.get(pid)
+        prob = rec.bench_autosub_probabilities.get(pid, 0.0) * 100
+        print(f"  Slot {12+s_idx} [Sub {s_idx}]:  {p.position_name} {p.web_name} ({p.team_short_name}) £{p.now_cost/10:.1f}m (Autosub Prob: {prob:.1f}%)")
+
     if rec.transfers_in:
-        print(f"Transfers IN: {rec.transfers_in}")
-        print(f"Transfers OUT: {rec.transfers_out}")
+        t_in = [f"{players_map[pid].web_name} ({players_map[pid].team_short_name})" for pid in rec.transfers_in if pid in players_map]
+        t_out = [f"{players_map[pid].web_name} ({players_map[pid].team_short_name})" for pid in rec.transfers_out if pid in players_map]
+        print(f"\nTransfers IN:  {', '.join(t_in)}")
+        print(f"Transfers OUT: {', '.join(t_out)}")
     else:
-        print("Transfers: None (Hold squad)")
+        print("\nTransfers: None (Hold squad)")
+
     if rec.chip_recommendation:
         print(f"Chip Advisory: {rec.chip_recommendation}")
-    print("Reasons:")
+
+    print("\nStrategic Optimization Rationale:")
     for idx, r in enumerate(rec.reasons, 1):
         print(f"  {idx}. {r}")
-    print(f"Approval Required: {rec.approval_required} (Status: {rec.approval_status})")
+    print(f"\nApproval Required: {rec.approval_required} (Status: {rec.approval_status})")
     print(f"Execution Status: {rec.execution_status}")
     if rec.transaction_hash:
         print(f"Transaction Hash: {rec.transaction_hash[:16]}...")
