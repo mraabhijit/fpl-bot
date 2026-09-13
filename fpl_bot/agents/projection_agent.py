@@ -65,15 +65,30 @@ class ProjectionAgent:
         expected_penalty_prob = 0.85 if pen_order == 1 else (0.3 if pen_order == 2 else 0.0)
         expected_set_piece_prob = 0.70 if set_order == 1 else (0.25 if set_order == 2 else 0.05)
 
-        # Next Gameweek Expected Points
+        # Next Gameweek Base Expected Points
         # Use fixture_score_1gw inverted to difficulty: diff = 6.0 - fixture_score
         estimated_diff = max(1.0, min(5.0, 6.0 - fixture_score.fixture_score_1gw))
-        xp_1gw = self.scoring.calculate_player_expected_points(
+        base_xp = self.scoring.calculate_player_expected_points(
             player=player,
             fixture_difficulty=estimated_diff,
             is_home=True,  # Average or blended
             availability=availability
         )
+
+        # Calibrated differential adjustment from adaptive learning model
+        delta = 0.0
+        try:
+            from fpl_bot.services.differential_trainer import differential_trainer
+            delta = differential_trainer.predict_adjustment(
+                player_id=player.id,
+                element_type=player.element_type,
+                team_short_name=player.team_short_name
+            )
+        except Exception:
+            delta = 0.0
+
+        # Calibrated expected points
+        xp_1gw = round(max(0.5, base_xp + delta), 2)
 
         # Multi-Gameweek Horizon Projections
         # Scale with horizon fixture scores
@@ -96,6 +111,8 @@ class ProjectionAgent:
             expected_penalty_probability=expected_penalty_prob,
             expected_set_piece_probability=expected_set_piece_prob,
             expected_fpl_points=xp_1gw,
+            base_expected_fpl_points=base_xp,
+            calibration_delta=delta,
             confidence=confidence,
             horizon_points={
                 1: xp_1gw,

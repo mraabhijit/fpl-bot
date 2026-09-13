@@ -152,6 +152,16 @@ python main.py scheduled --stage auto
 python main.py scheduled --stage primary --force
 ```
 
+### 7. Adaptive Differential Learning & Error Tracking
+Settle completed gameweek match telemetry, compute prediction residuals, and retrain the adaptive model:
+```bash
+# Retrain model on completed gameweeks using Bayesian Ridge shrinkage
+python main.py retrain --gameweek 4
+
+# Inspect gameweek error report, positional bias, and top differentials
+python main.py differentials --gameweek 4
+```
+
 ---
 
 ## GitHub Actions & GitHub Pages

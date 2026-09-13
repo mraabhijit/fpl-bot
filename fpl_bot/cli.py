@@ -5,6 +5,7 @@ Supports diagnostic, optimize, backtest, audit, and server modes.
 
 import sys
 import argparse
+from typing import Optional
 import uvicorn
 from fpl_bot.core.config import settings
 from fpl_bot.agents.orchestrator import orchestrator
@@ -147,6 +148,48 @@ def run_scheduled(stage: str = "auto", force: bool = False):
         print(f"  {k}: {v}")
 
 
+def run_retrain(gameweek: Optional[int] = None):
+    from fpl_bot.services.settlement_service import settlement_service
+    from fpl_bot.services.differential_trainer import differential_trainer
+
+    gw_target = gameweek or 4
+    print(f"Settling historical gameweek telemetry up to GW{gw_target}...")
+    settlement_service.backfill_historical_differentials(up_to_gw=gw_target)
+
+    print("Training adaptive differential learning model...")
+    metrics = differential_trainer.train(up_to_gw=gw_target)
+    print("============================================================")
+    print("MODEL RETRAINING REPORT")
+    print(f"Algorithm:           {metrics.get('algorithm')}")
+    print(f"Trained After GW:    {metrics.get('trained_after_gw')}")
+    print(f"Observations:        {metrics.get('sample_count'):,}")
+    print(f"Players Modeled:     {metrics.get('players_modeled')}")
+    print(f"Mean Absolute Error: {metrics.get('mae')} pts")
+    print(f"Root Mean Sq Error:  {metrics.get('rmse')} pts")
+    print(f"R-Squared:           {metrics.get('r2')}")
+    print("============================================================")
+
+
+def run_differentials(gameweek: Optional[int] = None):
+    from fpl_bot.services.differential_trainer import differential_trainer
+    summary = differential_trainer.get_differentials_summary(gameweek=gameweek)
+    print("============================================================")
+    print(f"GAMEWEEK {summary.get('gameweek')} DIFFERENTIALS & ERROR REPORT")
+    print(f"Sample Count: {summary.get('sample_count')}")
+    print("\nPosition-Level Average Residuals:")
+    for pos, val in summary.get("position_average_residuals", {}).items():
+        print(f"  {pos}: {val:+.2f} pts")
+
+    print("\nTop Overperforming Differentials (Actual > Projected):")
+    for d in summary.get("top_positive", []):
+        print(f"  {d['player_name']} ({d['team']} {d['position']}): Actual {d['actual_points']} vs Proj {d['projected_points']:.1f} (Residual: +{d['residual']:.2f})")
+
+    print("\nTop Underperforming Differentials (Actual < Projected):")
+    for d in summary.get("top_negative", []):
+        print(f"  {d['player_name']} ({d['team']} {d['position']}): Actual {d['actual_points']} vs Proj {d['projected_points']:.1f} (Residual: {d['residual']:.2f})")
+    print("============================================================")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Autonomous FPL Optimizer CLI")
     subparsers = parser.add_subparsers(dest="command", help="Command to run")
@@ -163,6 +206,12 @@ def main():
     sched_p.add_argument("--stage", default="auto", help="Milestone stage (auto, initial, refresh, primary, lineup_check, final_audit, safety_check)")
     sched_p.add_argument("--force", action="store_true", help="Force optimization run regardless of deadline window")
 
+    retrain_p = subparsers.add_parser("retrain", help="Retrain adaptive differential error-correction model")
+    retrain_p.add_argument("--gameweek", "-g", type=int, default=None, help="Gameweek up to which to train")
+
+    diff_p = subparsers.add_parser("differentials", help="Show gameweek differentials and model error report")
+    diff_p.add_argument("--gameweek", "-g", type=int, default=None, help="Gameweek to analyze")
+
     args = parser.parse_args()
 
     if args.command == "diagnostic":
@@ -177,6 +226,10 @@ def main():
         run_export(output_dir=args.output_dir)
     elif args.command == "scheduled":
         run_scheduled(stage=args.stage, force=args.force)
+    elif args.command == "retrain":
+        run_retrain(gameweek=args.gameweek)
+    elif args.command == "differentials":
+        run_differentials(gameweek=args.gameweek)
     else:
         parser.print_help()
 

@@ -290,6 +290,66 @@ class Database:
             );
             """)
 
+            # Gameweek Differentials (Residuals & Match Telemetry)
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS gameweek_differentials (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                gameweek INTEGER NOT NULL,
+                player_id INTEGER NOT NULL,
+                player_name TEXT,
+                team_short_name TEXT,
+                element_type INTEGER,
+                position_name TEXT,
+                projected_points REAL NOT NULL,
+                actual_points INTEGER NOT NULL,
+                residual REAL NOT NULL,
+                projected_minutes REAL NOT NULL,
+                actual_minutes INTEGER NOT NULL,
+                minutes_residual REAL NOT NULL,
+                xg REAL DEFAULT 0.0,
+                xa REAL DEFAULT 0.0,
+                actual_goals INTEGER DEFAULT 0,
+                actual_assists INTEGER DEFAULT 0,
+                bonus INTEGER DEFAULT 0,
+                bps INTEGER DEFAULT 0,
+                settled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(gameweek, player_id)
+            );
+            """)
+
+            # Model Checkpoints & Adaptive Weights
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS model_checkpoints (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                trained_after_gw INTEGER NOT NULL,
+                algorithm TEXT NOT NULL,
+                mae REAL NOT NULL,
+                rmse REAL NOT NULL,
+                r2 REAL NOT NULL,
+                sample_count INTEGER NOT NULL,
+                weights_json TEXT NOT NULL,
+                metrics_json TEXT,
+                trained_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """)
+
+            # Projection Snapshots Prior to Deadline
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS projection_snapshots (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                gameweek INTEGER NOT NULL,
+                player_id INTEGER NOT NULL,
+                player_name TEXT,
+                team_id INTEGER,
+                element_type INTEGER,
+                base_xp REAL NOT NULL,
+                expected_minutes REAL NOT NULL,
+                fixture_difficulty REAL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(gameweek, player_id)
+            );
+            """)
+
             conn.commit()
 
     def log_audit(self, gameweek: int, event_type: str, details: Any, result: str):
@@ -429,5 +489,131 @@ class Database:
             cursor.execute("SELECT id FROM executions WHERE transaction_hash = ?", (transaction_hash,))
             return cursor.fetchone() is not None
 
+    def save_gameweek_differential(self, data: Dict[str, Any]):
+        with self.get_connection() as conn:
+            conn.execute("""
+            INSERT INTO gameweek_differentials (
+                gameweek, player_id, player_name, team_short_name, element_type, position_name,
+                projected_points, actual_points, residual,
+                projected_minutes, actual_minutes, minutes_residual,
+                xg, xa, actual_goals, actual_assists, bonus, bps
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(gameweek, player_id) DO UPDATE SET
+                projected_points=excluded.projected_points,
+                actual_points=excluded.actual_points,
+                residual=excluded.residual,
+                projected_minutes=excluded.projected_minutes,
+                actual_minutes=excluded.actual_minutes,
+                minutes_residual=excluded.minutes_residual,
+                xg=excluded.xg,
+                xa=excluded.xa,
+                actual_goals=excluded.actual_goals,
+                actual_assists=excluded.actual_assists,
+                bonus=excluded.bonus,
+                bps=excluded.bps,
+                settled_at=CURRENT_TIMESTAMP
+            """, (
+                data.get("gameweek"), data.get("player_id"), data.get("player_name"),
+                data.get("team_short_name"), data.get("element_type"), data.get("position_name"),
+                data.get("projected_points", 0.0), data.get("actual_points", 0),
+                data.get("residual", 0.0), data.get("projected_minutes", 0.0),
+                data.get("actual_minutes", 0), data.get("minutes_residual", 0.0),
+                data.get("xg", 0.0), data.get("xa", 0.0), data.get("actual_goals", 0),
+                data.get("actual_assists", 0), data.get("bonus", 0), data.get("bps", 0)
+            ))
+            conn.commit()
+
+    def get_gameweek_differentials(self, gameweek: Optional[int] = None, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            if gameweek is not None:
+                query = "SELECT * FROM gameweek_differentials WHERE gameweek = ? ORDER BY abs(residual) DESC"
+                params = [gameweek]
+            else:
+                query = "SELECT * FROM gameweek_differentials ORDER BY gameweek DESC, abs(residual) DESC"
+                params = []
+            if limit:
+                query += f" LIMIT {int(limit)}"
+            cursor.execute(query, params)
+            return [dict(r) for r in cursor.fetchall()]
+
+    def save_model_checkpoint(self, data: Dict[str, Any]) -> int:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            INSERT INTO model_checkpoints (
+                trained_after_gw, algorithm, mae, rmse, r2, sample_count, weights_json, metrics_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                data.get("trained_after_gw"), data.get("algorithm", "ridge_shrinkage"),
+                data.get("mae", 0.0), data.get("rmse", 0.0), data.get("r2", 0.0),
+                data.get("sample_count", 0),
+                json.dumps(data.get("weights_json", {})),
+                json.dumps(data.get("metrics_json", {}))
+            ))
+            conn.commit()
+            return cursor.lastrowid
+
+    def get_latest_model_checkpoint(self) -> Optional[Dict[str, Any]]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM model_checkpoints ORDER BY id DESC LIMIT 1")
+            row = cursor.fetchone()
+            if not row:
+                return None
+            res = dict(row)
+            try:
+                res["weights_json"] = json.loads(res["weights_json"])
+            except Exception:
+                pass
+            try:
+                res["metrics_json"] = json.loads(res["metrics_json"])
+            except Exception:
+                pass
+            return res
+
+    def get_model_checkpoints(self, limit: int = 10) -> List[Dict[str, Any]]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM model_checkpoints ORDER BY id DESC LIMIT ?", (limit,))
+            rows = cursor.fetchall()
+            checkpoints = []
+            for r in rows:
+                c = dict(r)
+                try:
+                    c["weights_json"] = json.loads(c["weights_json"])
+                except Exception:
+                    pass
+                try:
+                    c["metrics_json"] = json.loads(c["metrics_json"])
+                except Exception:
+                    pass
+                checkpoints.append(c)
+            return checkpoints
+
+    def save_projection_snapshot(self, data: Dict[str, Any]):
+        with self.get_connection() as conn:
+            conn.execute("""
+            INSERT INTO projection_snapshots (
+                gameweek, player_id, player_name, team_id, element_type, base_xp, expected_minutes, fixture_difficulty
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(gameweek, player_id) DO UPDATE SET
+                base_xp=excluded.base_xp,
+                expected_minutes=excluded.expected_minutes,
+                fixture_difficulty=excluded.fixture_difficulty
+            """, (
+                data.get("gameweek"), data.get("player_id"), data.get("player_name"),
+                data.get("team_id"), data.get("element_type"), data.get("base_xp", 0.0),
+                data.get("expected_minutes", 0.0), data.get("fixture_difficulty", 3.0)
+            ))
+            conn.commit()
+
+    def get_projection_snapshots(self, gameweek: int) -> Dict[int, Dict[str, Any]]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM projection_snapshots WHERE gameweek = ?", (gameweek,))
+            return {r["player_id"]: dict(r) for r in cursor.fetchall()}
+
 
 db = Database()
+

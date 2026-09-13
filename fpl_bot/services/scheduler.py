@@ -162,6 +162,19 @@ class DeadlineScheduler:
         else:
             active_stage = stage
 
+        # Automatic post-gameweek settlement & adaptive model retraining
+        prev_gw = gw_id - 1
+        if prev_gw >= 1:
+            latest_chk = db.get_latest_model_checkpoint()
+            if not latest_chk or latest_chk.get("trained_after_gw", 0) < prev_gw:
+                try:
+                    from fpl_bot.services.settlement_service import settlement_service
+                    from fpl_bot.services.differential_trainer import differential_trainer
+                    settlement_service.settle_gameweek(prev_gw)
+                    differential_trainer.train(up_to_gw=prev_gw)
+                except Exception as e:
+                    db.log_audit(prev_gw, "AUTO_SETTLEMENT_ERROR", {"error": str(e)}, "WARNING")
+
         # Execute optimization cycle if not locked out
         executed = False
         rec = None

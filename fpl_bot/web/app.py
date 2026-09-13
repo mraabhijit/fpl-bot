@@ -117,6 +117,29 @@ async def update_auth_token(req: TokenUpdateRequest):
     })
 
 
+@app.get("/api/differentials")
+async def get_differentials(gameweek: Optional[int] = None):
+    try:
+        from fpl_bot.services.differential_trainer import differential_trainer
+        summary = differential_trainer.get_differentials_summary(gameweek=gameweek)
+        return JSONResponse(summary)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/retrain")
+async def trigger_model_retrain(gameweek: Optional[int] = None):
+    try:
+        from fpl_bot.services.settlement_service import settlement_service
+        from fpl_bot.services.differential_trainer import differential_trainer
+        gw = gameweek or 4
+        settlement_service.backfill_historical_differentials(up_to_gw=gw)
+        metrics = differential_trainer.train(up_to_gw=gw)
+        return JSONResponse(metrics)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/scheduler/jobs")
 async def get_scheduler_jobs():
     return JSONResponse(scheduler_service.get_scheduled_jobs())
