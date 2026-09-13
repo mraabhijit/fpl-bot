@@ -464,13 +464,13 @@
     <div class="container">
         <header>
             <div class="brand">
-                <h1>⚡ Overspent FC Optimizer</h1>
+                <h1>Overspent FC Optimizer</h1>
                 <p>Team ID: 6834344 • 2026/27 • Autonomous Expected Points Maximizer (Asia/Kolkata)</p>
             </div>
             <div class="header-actions">
                 <span id="mode-badge" class="badge badge-mode">DRY RUN MODE</span>
-                <button class="btn" onclick="openDiagnosticModal()">🔍 Diagnostic</button>
-                <button class="btn btn-primary" onclick="triggerOptimization()">🚀 Run Optimizer</button>
+                <button class="btn" onclick="openDiagnosticModal()">Diagnostic</button>
+                <button class="btn btn-primary" onclick="triggerOptimization()">Run Optimizer</button>
             </div>
         </header>
 
@@ -500,7 +500,7 @@
 
         <!-- Approval Card (Dynamically Rendered if action requires approval) -->
         <div id="approval-box" style="display: none;" class="approval-card">
-            <h2>⚠️ <span id="approval-title">ACTION REQUIRED</span></h2>
+            <h2><span id="approval-title">ACTION REQUIRED</span></h2>
             <div class="approval-content">
                 <div>
                     <div style="font-size: 14px; font-weight: 700;" id="approval-action-text">Proposed Transfer / Chip</div>
@@ -510,15 +510,15 @@
                     </div>
                 </div>
                 <div class="approval-actions">
-                    <button class="btn btn-primary" onclick="respondApproval('APPROVE')">✅ Approve [YES]</button>
-                    <button class="btn btn-danger" onclick="respondApproval('REJECT')">❌ Reject [NO]</button>
+                    <button class="btn btn-primary" onclick="respondApproval('APPROVE')">Approve [YES]</button>
+                    <button class="btn btn-danger" onclick="respondApproval('REJECT')">Reject [NO]</button>
                 </div>
             </div>
         </div>
 
         <!-- Routine Status Banner if Auto Allowed -->
         <div id="routine-banner" style="display: none; background: rgba(0, 255, 135, 0.1); border: 1px solid var(--pl-green); border-radius: 8px; padding: 12px 16px; margin-bottom: 24px; font-size: 13px; color: var(--pl-green);">
-            🛡️ Routine actions (lineup, captaincy, free transfer) automatically verified by Deadline Auditor.
+            Routine actions (lineup, captaincy, free transfer) automatically verified by Deadline Auditor.
         </div>
 
         <div class="main-layout">
@@ -527,15 +527,15 @@
                 <div class="section-card">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
                         <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-                            <h3 id="lineup-title" style="margin-bottom: 0;">⭐ Recommended Starting XI</h3>
+                            <h3 id="lineup-title" style="margin-bottom: 0;">Recommended Starting XI</h3>
                             <div class="btn-toggle-group">
-                                <button id="btn-toggle-rec" class="btn-toggle active" onclick="switchTeamView('rec')">⭐ Recommended</button>
-                                <button id="btn-toggle-curr" class="btn-toggle" onclick="switchTeamView('curr')">📋 Actual Team</button>
+                                <button id="btn-toggle-rec" class="btn-toggle active" onclick="switchTeamView('rec')">Recommended</button>
+                                <button id="btn-toggle-curr" class="btn-toggle" onclick="switchTeamView('curr')">Actual Team</button>
                             </div>
                             <!-- Secondary toggle (visible only in Actual Team tab) -->
                             <div id="actual-mode-toggle" class="btn-toggle-group" style="display: none;">
-                                <button id="btn-actual-pts" class="btn-toggle active" onclick="switchActualSubMode('actual')">⚽ Actual Points</button>
-                                <button id="btn-actual-pred" class="btn-toggle" onclick="switchActualSubMode('pred')">🔮 Model Predicted</button>
+                                <button id="btn-actual-pts" class="btn-toggle active" onclick="switchActualSubMode('actual')">Actual Points</button>
+                                <button id="btn-actual-pred" class="btn-toggle" onclick="switchActualSubMode('pred')">Model Predicted</button>
                             </div>
                         </div>
                         <span id="rec-xp-badge" style="font-size: 13px; font-weight: 700; color: var(--pl-green);">Projected XP: ...</span>
@@ -719,13 +719,13 @@
                 const outHtml = rec.transfers_out_players.map(p => 
                     `<div style="margin-bottom: 6px; padding: 8px; background: rgba(248, 81, 73, 0.1); border-radius: 6px; border: 1px solid rgba(248, 81, 73, 0.2);">
                         <span class="tag-danger">OUT:</span> <strong>${p.web_name}</strong> (${p.team_short_name} ${p.position_name}) • ${p.now_cost_str}<br>
-                        <span style="font-size: 11px; color: var(--text-secondary);">vs ${p.next_opponent} • ⚡ ${p.expected_points} xP</span>
+                        <span style="font-size: 11px; color: var(--text-secondary);">vs ${p.next_opponent} • ${p.expected_points} xP</span>
                     </div>`
                 ).join('');
                 const inHtml = rec.transfers_in_players.map(p => 
                     `<div style="margin-bottom: 6px; padding: 8px; background: rgba(0, 255, 135, 0.1); border-radius: 6px; border: 1px solid rgba(0, 255, 135, 0.2);">
                         <span class="tag-success">IN:</span> <strong>${p.web_name}</strong> (${p.team_short_name} ${p.position_name}) • ${p.now_cost_str}<br>
-                        <span style="font-size: 11px; color: var(--text-secondary);">vs ${p.next_opponent} • ⚡ ${p.expected_points} xP</span>
+                        <span style="font-size: 11px; color: var(--text-secondary);">vs ${p.next_opponent} • ${p.expected_points} xP</span>
                     </div>`
                 ).join('');
                 tView.innerHTML = `
@@ -776,15 +776,15 @@
 
             if (teamData) {
                 if (isRec) {
-                    titleEl.textContent = `⭐ Recommended Starting XI (${teamData.formation || '3-4-3'})`;
+                    titleEl.textContent = `Recommended Starting XI (${teamData.formation || '3-4-3'})`;
                     badgeEl.textContent = `Projected XP: ${teamData.total_xp} pts (XI: ${teamData.xi_xp} + Bench: ${teamData.bench_xp})`;
                 } else {
                     const gwNum = teamData.gameweek || 4;
                     if (currentActualSubMode === 'pred') {
-                        titleEl.textContent = `📋 Actual Team — GW${gwNum} (${teamData.formation || '3-4-3'})`;
+                        titleEl.textContent = `Actual Team — GW${gwNum} (${teamData.formation || '3-4-3'})`;
                         badgeEl.textContent = `Model Projected: ${teamData.total_xp} pts (Hold Strategy)`;
                     } else {
-                        titleEl.textContent = `📋 Actual Team — GW${gwNum} (${teamData.formation || '3-4-3'})`;
+                        titleEl.textContent = `Actual Team — GW${gwNum} (${teamData.formation || '3-4-3'})`;
                         badgeEl.textContent = `Actual Match Score: ${teamData.actual_total_pts || 46} pts`;
                     }
                 }
@@ -832,32 +832,32 @@
             if (viewMode === 'rec') {
                 if (isCap) {
                     const simXp = player.simulated_points !== undefined ? player.simulated_points : (player.expected_points * 2).toFixed(1);
-                    pointsBadge = `<div class="p-xp cap" title="Winning Simulation Captaincy (2x ${player.expected_points} xP)">👑 ${simXp} xP (C)</div>`;
+                    pointsBadge = `<div class="p-xp cap" title="Winning Simulation Captaincy (2x ${player.expected_points} xP)">${simXp} xP (C)</div>`;
                 } else if (isVice) {
-                    pointsBadge = `<div class="p-xp" title="Vice-Captain">⚡ ${player.expected_points} xP (V)</div>`;
+                    pointsBadge = `<div class="p-xp" title="Vice-Captain">${player.expected_points} xP (V)</div>`;
                 } else {
-                    pointsBadge = `<div class="p-xp" title="Expected Points">⚡ ${player.expected_points} xP</div>`;
+                    pointsBadge = `<div class="p-xp" title="Expected Points">${player.expected_points} xP</div>`;
                 }
             } else {
                 if (actualSubMode === 'pred') {
                     // Secondary toggle: Model Predicted
                     if (isCap) {
                         const predXp = player.predicted_points !== undefined ? player.predicted_points : (player.expected_points * 2).toFixed(1);
-                        pointsBadge = `<div class="p-xp cap" title="Model Predicted Captaincy (2x ${player.expected_points} xP)">👑 ${predXp} xP (C)</div>`;
+                        pointsBadge = `<div class="p-xp cap" title="Model Predicted Captaincy (2x ${player.expected_points} xP)">${predXp} xP (C)</div>`;
                     } else if (isVice) {
-                        pointsBadge = `<div class="p-xp" title="Model Predicted Vice-Captain">⚡ ${player.expected_points} xP (V)</div>`;
+                        pointsBadge = `<div class="p-xp" title="Model Predicted Vice-Captain">${player.expected_points} xP (V)</div>`;
                     } else {
-                        pointsBadge = `<div class="p-xp" title="Model Predicted for Gameweek">🔮 ${player.expected_points} xP</div>`;
+                        pointsBadge = `<div class="p-xp" title="Model Predicted for Gameweek">${player.expected_points} xP</div>`;
                     }
                 } else {
                     // Actual Points
                     const pts = player.actual_points !== undefined ? player.actual_points : 0;
                     if (isCap) {
-                        pointsBadge = `<div class="p-actual cap" title="Actual Captain Points (${player.base_actual_points || 0} x 2)">👑 ${pts} pts (C)</div>`;
+                        pointsBadge = `<div class="p-actual cap" title="Actual Captain Points (${player.base_actual_points || 0} x 2)">${pts} pts (C)</div>`;
                     } else if (isVice) {
-                        pointsBadge = `<div class="p-actual" title="Actual Vice-Captain Points">⚡ ${pts} pts (V)</div>`;
+                        pointsBadge = `<div class="p-actual" title="Actual Vice-Captain Points">${pts} pts (V)</div>`;
                     } else {
-                        pointsBadge = `<div class="p-actual" title="Actual Gameweek Points">⚽ ${pts} pts</div>`;
+                        pointsBadge = `<div class="p-actual" title="Actual Gameweek Points">${pts} pts</div>`;
                     }
                 }
             }
@@ -915,7 +915,7 @@
                         <td><strong>${r.actual_points}</strong></td>
                         <td>${r.hold_actual_points}</td>
                         <td class="${r.transfer_delta >= 0 ? 'tag-success' : 'tag-danger'}">${r.transfer_delta >= 0 ? '+' : ''}${r.transfer_delta}</td>
-                        <td>${r.captain_success ? '✅ Yes' : '⚠️ No'}</td>
+                        <td>${r.captain_success ? 'Yes' : 'No'}</td>
                         <td style="color: var(--text-secondary);">${r.notes}</td>
                     `;
                     tbody.appendChild(tr);
