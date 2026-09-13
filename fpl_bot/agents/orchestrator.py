@@ -76,11 +76,11 @@ class Orchestrator:
             "bank": f"£{current_squad.bank / 10:.1f}m",
             "free_transfers": current_squad.free_transfers,
             "current_xi": [
-                f"{p.position}. {p.player.position_name} {p.player.web_name} ({p.player.team_short_name}) £{p.player.now_cost/10:.1f}m"
+                f"{p.position}. {p.player.position_name} {p.player.web_name} ({p.player.team_short_name}) vs {p.player.next_opponent} £{p.player.now_cost/10:.1f}m"
                 for p in starting_xi if p.player
             ],
             "bench": [
-                f"{p.position}. {p.player.position_name} {p.player.web_name} ({p.player.team_short_name}) £{p.player.now_cost/10:.1f}m"
+                f"{p.position}. {p.player.position_name} {p.player.web_name} ({p.player.team_short_name}) vs {p.player.next_opponent} £{p.player.now_cost/10:.1f}m"
                 for p in bench if p.player
             ],
             "captain": f"{captain.player.web_name} ({captain.player.team_short_name})" if captain and captain.player else "N/A",
@@ -152,10 +152,19 @@ class Orchestrator:
         )
 
         if chip_rec:
-            recommendation.chip_recommendation = chip_rec.get("chip")
-            recommendation.reasons.append(f"Chip advisory: {chip_rec.get('reason')}")
-            recommendation.approval_required = True
-            recommendation.approval_status = "PENDING"
+            if chip_rec.get("chip") == "wildcard" and recommendation.hit_count == 0:
+                recommendation.reasons.append(
+                    "Chip advisory: Hold Wildcard. Routine squad adjustment (0 hit cost) does not justify deploying an unlimited-transfers chip."
+                )
+            else:
+                recommendation.chip_recommendation = chip_rec.get("chip")
+                recommendation.reasons.append(f"Chip advisory: {chip_rec.get('reason')}")
+                recommendation.approval_required = True
+                recommendation.approval_status = "PENDING"
+        else:
+            recommendation.reasons.append(
+                "Chip advisory: Hold all chips. Routine transfer management without hits optimizes expected season outcome."
+            )
 
         if recommendation.hit_count > 0:
             recommendation.approval_required = True

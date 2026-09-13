@@ -63,16 +63,26 @@ class ChipAgent:
                 }
 
         # 3. Wildcard Evaluation
+        # A Wildcard provides unlimited free transfers. It should NEVER be activated when
+        # routine management (1 free transfer, 0 hit cost) can optimize the squad.
+        # It is only justified when a structural overhaul of 4+ players is urgently needed
+        # and would otherwise cost 12-16+ points in hits.
         if "wildcard" in remaining:
-            # If 4 or more players have low availability or very poor multi-gw fixtures
-            low_performers = sum(1 for p in squad_projections if p and p.expected_fpl_points < 2.5)
-            if low_performers >= 4 and gameweek >= 4:
+            # Check starters specifically for injury/unavailability
+            starting_picks = [p for p in current_squad.picks if p.position <= 11]
+            compromised_starters = sum(
+                1 for p in starting_picks
+                if (p.player and p.player.status in ("i", "s", "u")) or
+                   (projections.get(p.element_id) and projections[p.element_id].expected_fpl_points < 2.0)
+            )
+            # Only recommend Wildcard if at least 4 starting positions are compromised AND free transfers cannot cover it
+            if compromised_starters >= 4 and current_squad.free_transfers < 3:
                 return {
                     "chip": "wildcard",
                     "immediate_expected_gain": 12.0,
                     "future_5gw_gain": 35.0,
-                    "opportunity_cost": 10.0,
-                    "reason": f"Structural squad refresh needed ({low_performers} underperforming/flagged players)."
+                    "opportunity_cost": 15.0,
+                    "reason": f"Urgent structural squad crisis: {compromised_starters} starting players unavailable or non-viable, requiring multi-transfer overhaul."
                 }
 
         # 4. Free Hit Evaluation

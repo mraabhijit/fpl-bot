@@ -19,6 +19,7 @@ class Player(BaseModel):
     position_name: str = ""  # GKP, DEF, MID, FWD
     now_cost: int  # in 10ths (e.g. 155 = 15.5m)
     cost_str: str = ""
+    next_opponent: str = ""
     status: str = "a"  # a: available, d: doubtful, i: injured, s: suspended, u: unavailable
     news: str = ""
     chance_of_playing_this_round: Optional[int] = 100

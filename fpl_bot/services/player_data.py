@@ -35,10 +35,30 @@ class PlayerDataService:
 
         position_names = {1: "GKP", 2: "DEF", 3: "MID", 4: "FWD"}
 
+        # Determine upcoming gameweek to map next opponent
+        events = raw.get("events", [])
+        next_event = next((e for e in events if e.get("is_next")), None)
+        curr_event = next((e for e in events if e.get("is_current")), None)
+        target_event_id = next_event["id"] if next_event else (curr_event["id"] if curr_event else 1)
+
+        team_fixtures: Dict[int, List[str]] = {}
+        try:
+            fixtures_raw = self.api.get_fixtures(target_event_id)
+            for f in fixtures_raw:
+                th = f.get("team_h")
+                ta = f.get("team_a")
+                th_opp = teams_map[ta].short_name if ta in teams_map else "OPP"
+                ta_opp = teams_map[th].short_name if th in teams_map else "OPP"
+                team_fixtures.setdefault(th, []).append(f"{th_opp} (H)")
+                team_fixtures.setdefault(ta, []).append(f"{ta_opp} (A)")
+        except Exception:
+            pass
+
         players_map: Dict[int, Player] = {}
         for el in raw.get("elements", []):
             tm = teams_map.get(el["team"])
             pos_name = position_names.get(el["element_type"], "UNK")
+            next_opp = ", ".join(team_fixtures.get(el["team"], [])) or "BLANK"
             players_map[el["id"]] = Player(
                 id=el["id"],
                 web_name=el["web_name"],
@@ -51,6 +71,7 @@ class PlayerDataService:
                 position_name=pos_name,
                 now_cost=el["now_cost"],
                 cost_str=f"{el['now_cost']/10:.1f}m",
+                next_opponent=next_opp,
                 status=el.get("status", "a"),
                 news=el.get("news", ""),
                 chance_of_playing_this_round=el.get("chance_of_playing_this_round"),
