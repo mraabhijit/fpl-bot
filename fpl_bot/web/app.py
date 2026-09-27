@@ -98,7 +98,7 @@ async def get_audits(limit: int = 50):
 async def get_backtests():
     with db.get_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM backtest_runs ORDER BY gameweek ASC")
+        cursor.execute("SELECT * FROM backtest_runs ORDER BY id DESC")
         rows = [dict(r) for r in cursor.fetchall()]
         return JSONResponse(rows)
 

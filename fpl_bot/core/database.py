@@ -461,7 +461,7 @@ class Database:
     def get_backtests(self) -> List[Dict[str, Any]]:
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM backtest_runs ORDER BY gameweek ASC")
+            cursor.execute("SELECT * FROM backtest_runs ORDER BY id DESC")
             return [dict(r) for r in cursor.fetchall()]
 
     def record_execution(self, exec_data: Dict[str, Any]):
