@@ -78,9 +78,7 @@
         .brand h1 {
             font-size: 26px;
             font-weight: 800;
-            background: linear-gradient(135deg, var(--pl-green), #00d2ff);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            color: var(--pl-green);
             display: flex;
             align-items: center;
             gap: 10px;
@@ -222,7 +220,7 @@
         }
 
         .btn-primary {
-            background: linear-gradient(135deg, #00ff87, #00b4d8);
+            background-color: var(--pl-green);
             color: #0d1117;
             border: none;
             font-weight: 700;
@@ -246,7 +244,7 @@
         /* Stats Grid */
         .grid-stats {
             display: grid;
-            grid-template-columns: repeat(5, minmax(0, 1fr));
+            grid-template-columns: repeat(6, minmax(0, 1fr));
             gap: 16px;
             margin-bottom: 24px;
         }
@@ -290,7 +288,7 @@
 
         /* Approvals banner */
         .approval-card {
-            background: linear-gradient(135deg, rgba(210, 153, 34, 0.15), rgba(22, 27, 34, 0.8));
+            background-color: rgba(210, 153, 34, 0.12);
             border: 2px solid var(--accent-yellow);
             border-radius: 12px;
             padding: 24px;
@@ -422,20 +420,20 @@
         }
 
         .btn-toggle.active {
-            background: linear-gradient(135deg, rgba(0, 255, 135, 0.2), rgba(0, 210, 255, 0.2));
+            background-color: rgba(0, 255, 135, 0.15);
             color: var(--pl-green);
             border: 1px solid var(--pl-green);
         }
 
         /* Pitch Container with Authentic Field Markings */
         .pitch-container {
-            background: radial-gradient(circle at 50% 50%, #1b4332 0%, #0d2818 70%, #081c10 100%);
+            background-color: #0f2c1d;
             border-radius: 12px;
             padding: 24px 16px;
             border: 1px solid rgba(0, 255, 135, 0.25);
             position: relative;
             overflow: hidden;
-            box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.5);
+            box-shadow: none;
         }
 
         .pitch-container::before {
@@ -465,10 +463,11 @@
         .lineup-row {
             display: flex;
             justify-content: space-around;
-            align-items: flex-start;
+            align-items: stretch;
             margin-bottom: 20px;
             position: relative;
             z-index: 1;
+            gap: 8px;
         }
 
         .lineup-row:last-child {
@@ -479,13 +478,19 @@
         .player-card {
             background: rgba(22, 27, 34, 0.95);
             border: 1px solid var(--border-color);
-            border-radius: 10px;
-            padding: 10px 12px;
+            border-radius: 8px;
+            padding: 8px 6px;
             text-align: center;
-            min-width: 120px;
-            max-width: 140px;
+            min-width: 100px;
+            max-width: 130px;
+            width: 100%;
             box-shadow: none;
             position: relative;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
             transition: transform 0.15s ease, border-color 0.15s ease;
         }
 
@@ -495,116 +500,131 @@
         }
 
         .player-card .p-name {
-            font-size: 13px;
+            font-size: 12.5px;
             font-weight: 800;
-            color: var(--text-primary);
+            color: #ffffff;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
             line-height: 1.25;
+            width: 100%;
         }
 
         .player-card .p-team {
             font-size: 11px;
             color: var(--text-secondary);
             font-weight: 500;
+            width: 100%;
         }
 
         .player-card .p-opp {
-            display: inline-block;
-            background: rgba(88, 166, 255, 0.15);
-            color: var(--accent-blue);
+            display: block;
+            width: 100%;
+            box-sizing: border-box;
+            background-color: rgba(88, 166, 255, 0.15);
+            color: #58a6ff;
             border: 1px solid rgba(88, 166, 255, 0.3);
             font-size: 10px;
             font-weight: 700;
-            padding: 2px 6px;
+            padding: 2px 5px;
             border-radius: 4px;
-            margin: 4px 0 3px 0;
+            margin: 3px 0;
             letter-spacing: 0.3px;
             white-space: nowrap;
-            max-width: 100%;
             overflow: hidden;
             text-overflow: ellipsis;
+            text-align: center;
         }
 
         .player-card .p-xp {
-            display: inline-block;
-            background: rgba(0, 255, 135, 0.15);
+            display: block;
+            width: 100%;
+            box-sizing: border-box;
+            background-color: rgba(0, 255, 135, 0.15);
             color: var(--pl-green);
             font-size: 11px;
             font-weight: 800;
-            padding: 2px 7px;
+            padding: 2px 5px;
             border-radius: 4px;
             white-space: nowrap;
-            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            text-align: center;
         }
 
         .player-card .p-xp.cap {
-            background: linear-gradient(135deg, rgba(255, 215, 0, 0.25), rgba(0, 255, 135, 0.25));
+            background-color: rgba(255, 215, 0, 0.2);
             color: #ffd700;
             border: 1px solid #ffd700;
         }
 
         .player-card .p-cost {
             font-size: 11px;
-            color: #c9d1d9;
-            font-weight: 700;
+            color: #8b949e;
+            font-weight: 600;
             margin: 2px 0;
             white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            width: 100%;
         }
 
         .player-card .p-actual {
-            display: inline-block;
-            background: rgba(255, 255, 255, 0.12);
+            display: block;
+            width: 100%;
+            box-sizing: border-box;
+            background-color: rgba(255, 255, 255, 0.12);
             color: #ffffff;
             font-size: 11px;
             font-weight: 800;
-            padding: 2px 7px;
+            padding: 2px 5px;
             border-radius: 4px;
             white-space: nowrap;
-            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            text-align: center;
         }
 
         .player-card .p-actual.cap {
-            background: linear-gradient(135deg, rgba(255, 215, 0, 0.25), rgba(0, 255, 135, 0.25));
+            background-color: rgba(255, 215, 0, 0.2);
             color: #ffd700;
             border: 1px solid #ffd700;
         }
 
         .badge-captain {
             position: absolute;
-            top: -8px;
-            right: -8px;
-            background: #00ff87;
-            color: #000;
+            top: -5px;
+            right: -5px;
+            background-color: var(--pl-green);
+            color: #0d1117;
             font-size: 10px;
             font-weight: 800;
-            width: 20px;
-            height: 20px;
+            width: 18px;
+            height: 18px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             box-shadow: none;
-            z-index: 2;
+            z-index: 5;
         }
 
         .badge-vice {
             position: absolute;
-            top: -8px;
-            right: -8px;
-            background: #58a6ff;
-            color: #000;
+            top: -5px;
+            right: -5px;
+            background-color: #58a6ff;
+            color: #0d1117;
             font-size: 10px;
             font-weight: 800;
-            width: 20px;
-            height: 20px;
+            width: 18px;
+            height: 18px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             box-shadow: none;
-            z-index: 2;
+            z-index: 5;
         }
 
         /* Bench Section */
@@ -625,11 +645,30 @@
         .bench-row {
             display: flex;
             justify-content: center;
-            gap: 16px;
+            gap: 12px;
             background-color: var(--bg-card);
             border-radius: 8px;
-            padding: 16px;
+            padding: 14px;
             border: 1px solid var(--border-color);
+            flex-wrap: wrap;
+        }
+
+        [data-theme="light"] .bench-row .player-card {
+            background-color: #f6f8fa;
+            border-color: #d0d7de;
+        }
+
+        [data-theme="light"] .bench-row .player-card .p-name {
+            color: #1f2328;
+        }
+
+        [data-theme="light"] .bench-row .player-card .p-cost {
+            color: #656d76;
+        }
+
+        [data-theme="light"] .bench-row .player-card .p-actual {
+            background-color: rgba(0, 0, 0, 0.08);
+            color: #1f2328;
         }
 
         /* Responsive Table Containers */
@@ -731,19 +770,11 @@
                 font-size: 13px;
             }
 
-            /* Stats on Tablet: 3 columns, cards 4 and 5 on second row */
+            /* Stats on Tablet: 3 columns (2 rows of 3) */
             .grid-stats {
                 grid-template-columns: repeat(3, minmax(0, 1fr));
                 gap: 14px;
                 margin-bottom: 20px;
-            }
-
-            .grid-stats > .stat-card:nth-child(4) {
-                grid-column: span 1;
-            }
-
-            .grid-stats > .stat-card:nth-child(5) {
-                grid-column: span 2;
             }
 
             .main-layout {
@@ -875,10 +906,6 @@
                 margin-top: 2px;
             }
 
-            .grid-stats > .stat-card:last-child {
-                grid-column: 1 / -1;
-            }
-
             .grid-stats > .stat-card:last-child .value {
                 font-size: 16px;
                 white-space: normal;
@@ -990,47 +1017,65 @@
             .player-card {
                 min-width: 0;
                 flex: 1 1 0;
-                max-width: 68px;
-                padding: 5px 2px;
+                max-width: 76px;
+                padding: 6px 2px;
                 border-radius: 6px;
                 box-shadow: none;
+                box-sizing: border-box;
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+                align-items: center;
             }
 
-            #row-gkp .player-card {
-                max-width: 78px;
-            }
-            #row-fwd .player-card {
-                max-width: 76px;
-            }
-            #row-def .player-card {
-                max-width: 72px;
-            }
+            #row-gkp .player-card,
+            #row-fwd .player-card,
+            #row-def .player-card,
             #row-mid .player-card {
-                max-width: 66px;
+                max-width: 80px;
             }
 
             .player-card .p-name {
-                font-size: 9.5px;
-                line-height: 1.15;
+                font-size: 10px;
+                line-height: 1.2;
+                width: 100%;
+                text-align: center;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
             }
 
             .player-card .p-cost {
-                font-size: 8.5px;
+                font-size: 9px;
                 margin: 1px 0;
+                width: 100%;
+                text-align: center;
             }
 
             .player-card .p-opp {
-                font-size: 8px;
-                padding: 1px 2px;
-                margin: 1px 0 2px 0;
-                border-radius: 2px;
+                font-size: 8.5px;
+                padding: 1px 3px;
+                margin: 2px 0;
+                border-radius: 3px;
+                width: 100%;
+                text-align: center;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                box-sizing: border-box;
             }
 
             .player-card .p-xp,
             .player-card .p-actual {
-                font-size: 8.5px;
-                padding: 1px 3px;
-                border-radius: 2px;
+                font-size: 9px;
+                padding: 2px 3px;
+                border-radius: 3px;
+                width: 100%;
+                text-align: center;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                box-sizing: border-box;
             }
 
             .badge-captain,
@@ -1196,9 +1241,14 @@
                 <div class="subtext">2026/27 Live</div>
             </div>
             <div class="stat-card">
-                <div class="label">Bank / Squad Value</div>
-                <div class="value" id="val-funds">...</div>
+                <div class="label">In The Bank</div>
+                <div class="value" id="val-bank">...</div>
                 <div class="subtext" id="val-ft">Free Transfers: ...</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Squad Value</div>
+                <div class="value" id="val-squad">...</div>
+                <div class="subtext" id="val-squad-sub">Total Squad Value</div>
             </div>
             <div class="stat-card">
                 <div class="label">Upcoming Deadline (IST)</div>
@@ -1245,7 +1295,7 @@
                 <div class="section-card">
                     <div class="section-header-collapsible" onclick="toggleSection('backtest-collapsible')">
                         <h3 style="margin-bottom: 0;">
-                            <span>Historical Backtesting Engine <span id="backtest-gw-range">(GW1 - GW4)</span></span>
+                            <span>Historical Backtesting Engine <span id="backtest-gw-range"></span></span>
                         </h3>
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <button class="btn" style="padding: 4px 10px; font-size: 12px;" onclick="event.stopPropagation(); runBacktest();">Run Backtest</button>
@@ -1558,7 +1608,8 @@
                 }
 
                 document.getElementById('val-points').textContent = diag.overall_points || '0';
-                document.getElementById('val-funds').textContent = `${diag.bank} in Bank / ${diag.team_value}`;
+                document.getElementById('val-bank').textContent = diag.bank || '£0.0m';
+                document.getElementById('val-squad').textContent = diag.team_value || '£100.0m';
                 document.getElementById('val-ft').textContent = `Free Transfers: ${diag.free_transfers}`;
                 document.getElementById('val-deadline').textContent = formatToIST(diag.deadline_ist || diag.deadline);
 
@@ -1796,9 +1847,9 @@
             if (viewMode === 'rec') {
                 if (isCap) {
                     const simXp = player.simulated_points !== undefined ? player.simulated_points : (player.expected_points * 2).toFixed(1);
-                    pointsBadge = `<div class="p-xp cap" title="Winning Simulation Captaincy (2x ${player.expected_points} xP)">${simXp} xP (C)</div>`;
+                    pointsBadge = `<div class="p-xp cap" title="Winning Simulation Captaincy (2x ${player.expected_points} xP)">${simXp} xP</div>`;
                 } else if (isVice) {
-                    pointsBadge = `<div class="p-xp" title="Vice-Captain">${player.expected_points} xP (V)</div>`;
+                    pointsBadge = `<div class="p-xp" title="Vice-Captain">${player.expected_points} xP</div>`;
                 } else {
                     pointsBadge = `<div class="p-xp" title="Expected Points">${player.expected_points} xP</div>`;
                 }
@@ -1806,18 +1857,18 @@
                 if (actualSubMode === 'pred') {
                     if (isCap) {
                         const predXp = player.predicted_points !== undefined ? player.predicted_points : (player.expected_points * 2).toFixed(1);
-                        pointsBadge = `<div class="p-xp cap" title="Model Predicted Captaincy (2x ${player.expected_points} xP)">${predXp} xP (C)</div>`;
+                        pointsBadge = `<div class="p-xp cap" title="Model Predicted Captaincy (2x ${player.expected_points} xP)">${predXp} xP</div>`;
                     } else if (isVice) {
-                        pointsBadge = `<div class="p-xp" title="Model Predicted Vice-Captain">${player.expected_points} xP (V)</div>`;
+                        pointsBadge = `<div class="p-xp" title="Model Predicted Vice-Captain">${player.expected_points} xP</div>`;
                     } else {
                         pointsBadge = `<div class="p-xp" title="Model Predicted for Gameweek">${player.expected_points} xP</div>`;
                     }
                 } else {
                     const pts = player.actual_points !== undefined ? player.actual_points : 0;
                     if (isCap) {
-                        pointsBadge = `<div class="p-actual cap" title="Actual Captain Points (${player.base_actual_points || 0} x 2)">${pts} pts (C)</div>`;
+                        pointsBadge = `<div class="p-actual cap" title="Actual Captain Points (${player.base_actual_points || 0} x 2)">${pts} pts</div>`;
                     } else if (isVice) {
-                        pointsBadge = `<div class="p-actual" title="Actual Vice-Captain Points">${pts} pts (V)</div>`;
+                        pointsBadge = `<div class="p-actual" title="Actual Vice-Captain Points">${pts} pts</div>`;
                     } else {
                         pointsBadge = `<div class="p-actual" title="Actual Gameweek Points">${pts} pts</div>`;
                     }

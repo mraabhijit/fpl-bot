@@ -120,8 +120,9 @@ def run_optimization():
 
 
 def run_backtests():
-    print("Running historical backtest simulation for GW1-GW4 (zero data leakage)...")
-    results = backtesting_engine.run_all_historical(up_to_gw=4)
+    latest_gw = backtesting_engine.get_latest_completed_gameweek()
+    print(f"Running historical backtest simulation for GW2-GW{latest_gw} (zero data leakage)...")
+    results = backtesting_engine.run_all_historical(up_to_gw=latest_gw)
     print(f"{'GW':<5}{'Projected':<12}{'Optimized':<12}{'Hold/Act':<12}{'Delta':<8}{'Cap Success':<12}")
     print("-" * 65)
     for r in results:
