@@ -61,13 +61,9 @@ class Settings(BaseSettings):
     projection_horizons: List[int] = [1, 3, 5, 8]
 
     # Scheduling offsets (minutes before deadline)
+    # Intermediate builds removed; only T-3h primary run before deadline
     schedule_stages: dict = {
-        "initial": 1440,    # T-24h
-        "refresh": 360,     # T-6h
         "primary": 180,     # T-3h (User primary run)
-        "lineup_check": 90, # T-90m
-        "final_audit": 30,  # T-30m
-        "safety_check": 15, # T-15m
     }
 
     # Web Dashboard

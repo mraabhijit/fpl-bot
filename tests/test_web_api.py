@@ -12,7 +12,7 @@ def test_dashboard_html(client):
     response = client.get("/")
     assert response.status_code == 200
     assert "Overspent FC" in response.text
-    assert "6834344" in response.text
+    assert "Autonomous Expected Points Maximizer" in response.text
 
 
 def test_api_diagnostic(client):

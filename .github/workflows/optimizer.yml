@@ -2,8 +2,10 @@ name: Autonomous FPL Optimizer & GitHub Pages
 
 on:
   schedule:
-    # Run every 30 minutes to dynamically evaluate deadline milestones
-    - cron: '*/30 * * * *'
+    # 18:30 UTC is exactly 00:00 IST (daily matchday & post-matchday settlement)
+    - cron: '30 18 * * *'
+    # Hourly check to catch dynamic T-3h deadline windows across all gameweeks
+    - cron: '0 * * * *'
   workflow_dispatch:
     inputs:
       stage:
@@ -13,17 +15,16 @@ on:
         type: choice
         options:
           - auto
-          - initial
-          - refresh
           - primary
-          - lineup_check
-          - final_audit
-          - safety_check
-          - routine_refresh
       force:
         description: 'Force optimization cycle execution'
         required: false
         default: true
+        type: boolean
+      run_backtest:
+        description: 'Execute historical backtesting suite'
+        required: false
+        default: false
         type: boolean
   push:
     branches:
@@ -45,6 +46,8 @@ concurrency:
 jobs:
   optimize-and-build:
     runs-on: ubuntu-latest
+    outputs:
+      executed: ${{ steps.scheduled-run.outputs.executed }}
     env:
       FPL_EMAIL: ${{ secrets.FPL_EMAIL }}
       FPL_PASSWORD: ${{ secrets.FPL_PASSWORD }}
@@ -77,11 +80,8 @@ jobs:
           restore-keys: |
             fpl-db-
 
-      - name: Run verification test suite
-        run: |
-          pytest tests/ -v
-
       - name: Run scheduled optimization workflow
+        id: scheduled-run
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             if [ "${{ github.event.inputs.force }}" = "true" ]; then
@@ -89,11 +89,20 @@ jobs:
             else
               python main.py scheduled --stage "${{ github.event.inputs.stage }}"
             fi
+            if [ "${{ github.event.inputs.run_backtest }}" = "true" ]; then
+              python main.py backtest
+            fi
           else
             python main.py scheduled --stage auto
           fi
 
+      - name: Run verification test suite
+        if: steps.scheduled-run.outputs.executed == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'push'
+        run: |
+          pytest tests/ -v
+
       - name: Export static dashboard for GitHub Pages
+        if: steps.scheduled-run.outputs.executed == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'push'
         run: |
           python main.py export --output-dir dist
 
@@ -105,12 +114,14 @@ jobs:
           key: fpl-db-${{ github.run_id }}
 
       - name: Upload GitHub Pages artifact
+        if: steps.scheduled-run.outputs.executed == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'push'
         uses: actions/upload-pages-artifact@v3
         with:
           path: dist
 
   deploy-pages:
     needs: optimize-and-build
+    if: needs.optimize-and-build.outputs.executed == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'push'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

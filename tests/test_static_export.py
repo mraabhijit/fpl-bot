@@ -45,6 +45,23 @@ def test_check_and_run_scheduled_workflow():
     assert "hours_remaining" in result
 
 
+def test_check_and_run_scheduled_workflow_skips_outside_milestones(monkeypatch):
+    # Ensure outside milestone window and not matchday
+    monkeypatch.setattr(scheduler_service, "_is_matchday_or_settlement_window", lambda gw: False)
+    # Monkeypatch mins_remaining to be 500 mins (neither T-3h nor negative)
+    orig_get_info = scheduler_service.get_next_gameweek_info
+    info = orig_get_info()
+    if info:
+        from datetime import datetime, timezone, timedelta
+        fake_deadline = datetime.now(timezone.utc) + timedelta(minutes=500)
+        info["deadline_utc"] = fake_deadline
+        monkeypatch.setattr(scheduler_service, "get_next_gameweek_info", lambda: info)
+
+    result = scheduler_service.check_and_run_scheduled_workflow(stage="auto", force=False)
+    assert result["executed"] is False
+    assert result["status"] == "SKIPPED_NO_BUILD_DUE"
+
+
 def test_cli_runners(tmp_path):
     out_dir = tmp_path / "cli_dist"
     run_export(output_dir=str(out_dir))

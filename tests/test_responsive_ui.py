@@ -33,19 +33,27 @@ def test_responsive_media_queries(client):
     assert "max-width: 380px" in text
 
 
-def test_device_switcher_component(client):
-    """Verify that the interactive device preview switcher is embedded with Desktop, Tablet, and Phone modes."""
+def test_theme_and_collapsible_components(client):
+    """Verify theme switcher, collapsible accordions, and removal of manual device preview switcher."""
     resp = client.get("/")
     assert resp.status_code == 200
     text = resp.text
 
-    assert "device-switcher" in text
-    assert "btn-device" in text
-    assert "data-device=\"desktop\"" in text
-    assert "data-device=\"tablet\"" in text
-    assert "data-device=\"phone\"" in text
-    assert "data-device=\"auto\"" in text
-    assert "setDeviceMode" in text
+    # Verify device switcher was removed (always auto fluid responsive)
+    assert "device-switcher" not in text
+    assert "btn-device" not in text
+
+    # Verify theme toggle and dual-theme attributes
+    assert "theme-toggle-btn" in text
+    assert "toggleTheme" in text
+    assert '[data-theme="light"]' in text
+
+    # Verify collapsible sections
+    assert "section-header-collapsible" in text
+    assert "toggleSection" in text
+    assert "backtest-collapsible" in text
+    assert "diff-collapsible" in text
+    assert "audit-collapsible" in text
 
 
 def test_responsive_layout_containers(client):
