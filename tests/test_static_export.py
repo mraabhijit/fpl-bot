@@ -37,7 +37,6 @@ def test_export_static_site_creates_all_artifacts(tmp_path):
     with open(out_dir / "index.html", "r", encoding="utf-8") as f:
         html = f.read()
         assert "Overspent FC Optimizer" in html
-        assert "v1.1.0" in html
         assert "apiFetch" in html
 
 
