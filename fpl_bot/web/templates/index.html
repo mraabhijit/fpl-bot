@@ -86,6 +86,20 @@
             gap: 10px;
         }
 
+        .version-badge {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 6px;
+            background: rgba(0, 255, 135, 0.15);
+            border: 1px solid rgba(0, 255, 135, 0.3);
+            color: var(--pl-green);
+            -webkit-text-fill-color: var(--pl-green);
+            letter-spacing: 0.5px;
+            vertical-align: middle;
+            display: inline-block;
+        }
+
         .brand p {
             color: var(--text-secondary);
             font-size: 14px;
@@ -1169,7 +1183,7 @@
     <div class="container">
         <header>
             <div class="brand">
-                <h1>Overspent FC Optimizer</h1>
+                <h1>Overspent FC Optimizer <span id="app-version" class="version-badge">v1.1.0</span></h1>
                 <p>2026/27 • Autonomous Expected Points Maximizer</p>
             </div>
             <div class="header-actions">
@@ -1529,6 +1543,10 @@
                 const diagRes = await apiFetch('/api/diagnostic');
                 const diag = await diagRes.json();
                 currentDiag = diag;
+                if (diag && diag.version) {
+                    const vEl = document.getElementById('app-version');
+                    if (vEl) vEl.textContent = diag.version;
+                }
                 
                 document.getElementById('val-rank').textContent = diag.overall_rank ? diag.overall_rank.toLocaleString() : 'N/A';
 

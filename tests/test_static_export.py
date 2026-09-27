@@ -20,20 +20,24 @@ def test_export_static_site_creates_all_artifacts(tmp_path):
     assert (out_dir / "data" / "recommendation.json").exists()
     assert (out_dir / "data" / "audits.json").exists()
     assert (out_dir / "data" / "backtests.json").exists()
+    assert res.get("version") == "v1.1.0"
 
     with open(out_dir / "data" / "diagnostic.json", "r", encoding="utf-8") as f:
         diag = json.load(f)
         assert "team_id" in diag
         assert diag["team_name"] == "Overspent FC"
+        assert diag.get("version") == "v1.1.0"
 
     with open(out_dir / "data" / "recommendation.json", "r", encoding="utf-8") as f:
         rec = json.load(f)
         assert "recommended_team" in rec
         assert "starting_xi" in rec["recommended_team"]
+        assert rec.get("version") == "v1.1.0"
 
     with open(out_dir / "index.html", "r", encoding="utf-8") as f:
         html = f.read()
         assert "Overspent FC Optimizer" in html
+        assert "v1.1.0" in html
         assert "apiFetch" in html
 
 

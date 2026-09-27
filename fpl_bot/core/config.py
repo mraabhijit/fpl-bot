@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     # Core Identifiers
     team_id: int = 6834344
     team_name: str = "Overspent FC"
+    version: str = "v1.1.0"
     season: str = "2026/27"
     timezone: str = "Asia/Kolkata"
 
