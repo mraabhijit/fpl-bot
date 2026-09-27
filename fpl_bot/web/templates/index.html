@@ -246,19 +246,19 @@
             display: grid;
             grid-template-columns: repeat(6, minmax(0, 1fr));
             gap: 16px;
-            margin-bottom: 24px;
+            margin-bottom: 16px;
         }
 
         .stat-card {
             background-color: var(--bg-secondary);
             border: 1px solid var(--border-color);
             border-radius: 12px;
-            padding: 20px;
+            padding: 16px 14px;
             min-width: 0;
         }
 
         .stat-card .label {
-            font-size: 12px;
+            font-size: 11.5px;
             color: var(--text-secondary);
             text-transform: uppercase;
             font-weight: 600;
@@ -268,17 +268,43 @@
         }
 
         .stat-card .value {
-            font-size: 28px;
+            font-size: 26px;
             font-weight: 800;
-            margin-top: 8px;
+            margin-top: 6px;
             color: var(--text-primary);
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
 
-        .stat-card .subtext {
+        .stat-card .value.value-deadline {
+            font-size: 15.5px;
+            font-weight: 800;
+            line-height: 1.25;
+            margin-top: 6px;
+            white-space: normal;
+            overflow: visible;
+        }
+
+        .deadline-date {
+            display: block;
+            font-size: 15.5px;
+            font-weight: 800;
+            color: var(--text-primary);
+            white-space: nowrap;
+        }
+
+        .deadline-time {
+            display: block;
             font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-top: 2px;
+            white-space: nowrap;
+        }
+
+        .stat-card .subtext {
+            font-size: 11.5px;
             color: var(--pl-green);
             margin-top: 4px;
             white-space: nowrap;
@@ -344,18 +370,20 @@
             gap: 12px;
         }
 
-        /* Main 2-Column Responsive Layout */
+        /* Main 2-Column Responsive Layout (aligned to 6-column spatial grid) */
         .main-layout {
             display: grid;
-            grid-template-columns: minmax(0, 1.85fr) minmax(0, 1fr);
-            gap: 24px;
+            grid-template-columns: repeat(6, minmax(0, 1fr));
+            gap: 16px;
         }
 
         .main-content-col {
+            grid-column: span 4;
             min-width: 0;
         }
 
         .sidebar-col {
+            grid-column: span 2;
             min-width: 0;
         }
 
@@ -364,7 +392,7 @@
             border: 1px solid var(--border-color);
             border-radius: 12px;
             padding: 20px;
-            margin-bottom: 24px;
+            margin-bottom: 16px;
         }
 
         .section-card h3 {
@@ -779,11 +807,16 @@
 
             .main-layout {
                 grid-template-columns: 1fr;
-                gap: 20px;
+                gap: 16px;
+            }
+
+            .main-content-col {
+                grid-column: auto;
             }
 
             /* Sidebar cards sit side-by-side in 2-column grid on tablet */
             .sidebar-col {
+                grid-column: auto;
                 display: grid;
                 grid-template-columns: repeat(2, minmax(0, 1fr));
                 gap: 16px;
@@ -945,7 +978,12 @@
                 gap: 16px;
             }
 
+            .main-content-col {
+                grid-column: auto;
+            }
+
             .sidebar-col {
+                grid-column: auto;
                 display: flex;
                 flex-direction: column;
                 gap: 16px;
@@ -1251,8 +1289,8 @@
                 <div class="subtext" id="val-squad-sub">Total Squad Value</div>
             </div>
             <div class="stat-card">
-                <div class="label">Upcoming Deadline (IST)</div>
-                <div class="value" style="font-size: 18px;" id="val-deadline">...</div>
+                <div class="label">Next Deadline (IST)</div>
+                <div class="value value-deadline" id="val-deadline">...</div>
                 <div class="subtext" id="val-countdown">Primary run: T-3h</div>
             </div>
         </div>
@@ -1294,12 +1332,19 @@
                 <!-- Backtest Results -->
                 <div class="section-card">
                     <div class="section-header-collapsible" onclick="toggleSection('backtest-collapsible')">
-                        <h3 style="margin-bottom: 0;">
-                            <span>Historical Backtesting Engine <span id="backtest-gw-range"></span></span>
-                        </h3>
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                            <button class="btn" style="padding: 4px 10px; font-size: 12px;" onclick="event.stopPropagation(); runBacktest();">Run Backtest</button>
-                            <span class="collapse-icon" id="backtest-collapsible-icon">▼</span>
+                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                            <h3 style="margin-bottom: 0;">
+                                <span>Historical Backtesting Engine <span id="backtest-gw-range"></span></span>
+                            </h3>
+                            <span id="backtest-run-badge" style="font-size: 11.5px; color: var(--text-secondary); font-weight: 500;"></span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;" onclick="event.stopPropagation();">
+                            <select id="backtest-run-select" class="btn" style="padding: 4px 8px; font-size: 11.5px; background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer;" onchange="onBacktestRunSelect(this.value)">
+                                <option value="latest">Latest Run</option>
+                                <option value="all">All Runs</option>
+                            </select>
+                            <button class="btn" style="padding: 4px 10px; font-size: 12px;" onclick="runBacktest();">Run Backtest</button>
+                            <span class="collapse-icon" id="backtest-collapsible-icon" onclick="toggleSection('backtest-collapsible');">▼</span>
                         </div>
                     </div>
                     <div id="backtest-collapsible" class="collapsible-body" style="margin-top: 14px;">
@@ -1307,6 +1352,7 @@
                             <table>
                                 <thead>
                                     <tr>
+                                        <th>Run Date</th>
                                         <th>GW</th>
                                         <th>Projected XP</th>
                                         <th>Optimized Actual</th>
@@ -1317,7 +1363,7 @@
                                     </tr>
                                 </thead>
                                 <tbody id="backtest-table-body">
-                                    <tr><td colspan="7" style="color: var(--text-secondary); text-align: center;">Click "Run Backtest" to evaluate historical strategy without data leakage.</td></tr>
+                                    <tr><td colspan="8" style="color: var(--text-secondary); text-align: center;">Click "Run Backtest" to evaluate historical strategy without data leakage.</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -1574,6 +1620,38 @@
             }
         }
 
+        function formatDeadlineCard(val) {
+            if (!val || val === 'N/A') return 'N/A';
+            let dateStr = '';
+            let timeStr = '';
+            if (typeof val === 'string' && val.includes('IST')) {
+                const parts = val.split(',');
+                if (parts.length >= 2) {
+                    dateStr = parts[0].trim();
+                    timeStr = parts.slice(1).join(',').trim();
+                } else {
+                    dateStr = val;
+                }
+            } else {
+                try {
+                    const d = new Date(val);
+                    if (!isNaN(d.getTime())) {
+                        dateStr = d.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' });
+                        timeStr = d.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false }) + ' IST';
+                    } else {
+                        dateStr = val;
+                    }
+                } catch (e) {
+                    dateStr = val;
+                }
+            }
+
+            if (timeStr) {
+                return `<div class="deadline-date">${dateStr}</div><div class="deadline-time">${timeStr}</div>`;
+            }
+            return `<div class="deadline-date">${dateStr}</div>`;
+        }
+
         async function loadData() {
             try {
                 const diagRes = await apiFetch('/api/diagnostic');
@@ -1611,7 +1689,7 @@
                 document.getElementById('val-bank').textContent = diag.bank || '£0.0m';
                 document.getElementById('val-squad').textContent = diag.team_value || '£100.0m';
                 document.getElementById('val-ft').textContent = `Free Transfers: ${diag.free_transfers}`;
-                document.getElementById('val-deadline').textContent = formatToIST(diag.deadline_ist || diag.deadline);
+                document.getElementById('val-deadline').innerHTML = formatDeadlineCard(diag.deadline_ist || diag.deadline);
 
                 // Load recommendation
                 const recRes = await apiFetch('/api/recommendation');
@@ -1914,35 +1992,168 @@
             } catch (e) {}
         }
 
+        let allBacktestRows = [];
+        let groupedBacktestRuns = [];
+
+        function formatRunDate(ts) {
+            if (!ts) return 'N/A';
+            try {
+                const iso = ts.includes('T') ? ts : ts.replace(' ', 'T') + 'Z';
+                const d = new Date(iso);
+                if (isNaN(d.getTime())) return ts;
+                return d.toLocaleDateString('en-IN', {
+                    timeZone: 'Asia/Kolkata',
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric'
+                }) + ', ' + d.toLocaleTimeString('en-IN', {
+                    timeZone: 'Asia/Kolkata',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false
+                }) + ' IST';
+            } catch (e) {
+                return ts;
+            }
+        }
+
+        function clusterBacktestRuns(rows) {
+            if (!rows || rows.length === 0) return [];
+            // Sort by id DESC or created_at DESC
+            const sorted = [...rows].sort((a, b) => (b.id || 0) - (a.id || 0));
+            const runs = [];
+            let currentRun = null;
+
+            sorted.forEach(row => {
+                const t = row.created_at ? new Date(row.created_at.replace(' ', 'T')).getTime() : 0;
+                if (!currentRun || (currentRun.refTime - t) > 10 * 60 * 1000) {
+                    currentRun = {
+                        id: `run_${runs.length + 1}`,
+                        dateStr: row.created_at ? formatRunDate(row.created_at) : 'Unknown Date',
+                        refTime: t,
+                        rows: []
+                    };
+                    runs.push(currentRun);
+                }
+                currentRun.rows.push(row);
+            });
+
+            // Sort rows within each run by gameweek ASC
+            runs.forEach(r => {
+                r.rows.sort((a, b) => a.gameweek - b.gameweek);
+            });
+
+            return runs;
+        }
+
+        function updateBacktestRunDropdown() {
+            const select = document.getElementById('backtest-run-select');
+            if (!select) return;
+            const currentVal = select.value;
+            select.innerHTML = '';
+
+            if (groupedBacktestRuns.length === 0) {
+                const opt = document.createElement('option');
+                opt.value = 'latest';
+                opt.textContent = 'No Runs';
+                select.appendChild(opt);
+                return;
+            }
+
+            groupedBacktestRuns.forEach((run, idx) => {
+                const opt = document.createElement('option');
+                opt.value = run.id;
+                if (idx === 0) {
+                    opt.textContent = `Latest: ${run.dateStr}`;
+                } else {
+                    opt.textContent = `Run ${groupedBacktestRuns.length - idx}: ${run.dateStr}`;
+                }
+                select.appendChild(opt);
+            });
+
+            if (groupedBacktestRuns.length > 1) {
+                const optAll = document.createElement('option');
+                optAll.value = 'all';
+                optAll.textContent = `All Runs (${allBacktestRows.length} total entries)`;
+                select.appendChild(optAll);
+            }
+
+            if (currentVal && Array.from(select.options).some(o => o.value === currentVal)) {
+                select.value = currentVal;
+            } else {
+                select.value = groupedBacktestRuns[0].id;
+            }
+        }
+
+        function renderBacktestTable() {
+            const select = document.getElementById('backtest-run-select');
+            const selectedRunId = select ? select.value : 'run_1';
+            const tbody = document.getElementById('backtest-table-body');
+            const rangeEl = document.getElementById('backtest-gw-range');
+            const badgeEl = document.getElementById('backtest-run-badge');
+
+            let displayRows = [];
+            if (selectedRunId === 'all') {
+                displayRows = [...allBacktestRows].sort((a, b) => {
+                    const timeDiff = new Date(b.created_at || 0) - new Date(a.created_at || 0);
+                    if (timeDiff !== 0) return timeDiff;
+                    return a.gameweek - b.gameweek;
+                });
+                if (badgeEl) badgeEl.textContent = 'Showing All Historical Runs';
+            } else {
+                const targetRun = groupedBacktestRuns.find(r => r.id === selectedRunId) || groupedBacktestRuns[0];
+                displayRows = targetRun ? targetRun.rows : [];
+                if (badgeEl && targetRun) {
+                    badgeEl.textContent = `Run on ${targetRun.dateStr}`;
+                }
+            }
+
+            if (!displayRows || displayRows.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" style="color: var(--text-secondary); text-align: center;">No backtest records found. Click "Run Backtest" to generate.</td></tr>`;
+                if (rangeEl) rangeEl.textContent = '';
+                return;
+            }
+
+            const gws = displayRows.map(r => r.gameweek).filter(g => typeof g === 'number');
+            if (gws.length > 0 && rangeEl) {
+                const minGW = Math.min(...gws);
+                const maxGW = Math.max(...gws);
+                rangeEl.textContent = `(GW${minGW} - GW${maxGW})`;
+            }
+
+            tbody.innerHTML = '';
+            displayRows.forEach(r => {
+                const tr = document.createElement('tr');
+                const formattedDate = r.created_at ? formatRunDate(r.created_at) : 'N/A';
+                tr.innerHTML = `
+                    <td style="font-size: 11.5px; color: var(--text-secondary); white-space: nowrap;">${formattedDate}</td>
+                    <td><strong>GW${r.gameweek}</strong></td>
+                    <td>${r.projected_points !== undefined ? r.projected_points.toFixed(1) : 'N/A'}</td>
+                    <td><strong>${r.actual_points}</strong></td>
+                    <td>${r.hold_actual_points}</td>
+                    <td class="${r.transfer_delta >= 0 ? 'tag-success' : 'tag-danger'}">${r.transfer_delta >= 0 ? '+' : ''}${r.transfer_delta}</td>
+                    <td>${r.captain_success ? 'Yes' : 'No'}</td>
+                    <td style="color: var(--text-secondary); font-size: 12px;">${r.notes}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function onBacktestRunSelect(val) {
+            renderBacktestTable();
+        }
+
         async function loadBacktests() {
             try {
                 const res = await apiFetch('/api/backtests');
                 const rows = await res.json();
-                const tbody = document.getElementById('backtest-table-body');
-                if (rows && rows.length > 0) {
-                    tbody.innerHTML = '';
-                    const gws = rows.map(r => r.gameweek).filter(g => typeof g === 'number');
-                    if (gws.length > 0) {
-                        const minGW = Math.min(...gws);
-                        const maxGW = Math.max(...gws);
-                        const rangeEl = document.getElementById('backtest-gw-range');
-                        if (rangeEl) rangeEl.textContent = `(GW${minGW} - GW${maxGW})`;
-                    }
-                }
-                (rows || []).forEach(r => {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td>GW${r.gameweek}</td>
-                        <td>${r.projected_points.toFixed(1)}</td>
-                        <td><strong>${r.actual_points}</strong></td>
-                        <td>${r.hold_actual_points}</td>
-                        <td class="${r.transfer_delta >= 0 ? 'tag-success' : 'tag-danger'}">${r.transfer_delta >= 0 ? '+' : ''}${r.transfer_delta}</td>
-                        <td>${r.captain_success ? 'Yes' : 'No'}</td>
-                        <td style="color: var(--text-secondary);">${r.notes}</td>
-                    `;
-                    tbody.appendChild(tr);
-                });
-            } catch (e) {}
+                allBacktestRows = rows || [];
+                groupedBacktestRuns = clusterBacktestRuns(allBacktestRows);
+                updateBacktestRunDropdown();
+                renderBacktestTable();
+            } catch (e) {
+                console.error("Failed loading backtests:", e);
+            }
         }
 
         async function runBacktest() {
@@ -1951,9 +2162,9 @@
                 return;
             }
             const tbody = document.getElementById('backtest-table-body');
-            tbody.innerHTML = `<tr><td colspan="7" style="color: var(--pl-green); text-align: center;">Running historical backtesting simulation...</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="8" style="color: var(--pl-green); text-align: center;">Running historical backtesting simulation...</td></tr>`;
             await fetch('/api/backtests/run', { method: 'POST' });
-            loadBacktests();
+            await loadBacktests();
             loadAudits();
         }
 
