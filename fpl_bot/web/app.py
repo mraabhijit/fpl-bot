@@ -16,7 +16,7 @@ from fpl_bot.agents.orchestrator import orchestrator
 from fpl_bot.core.backtest import backtesting_engine
 from fpl_bot.services.scheduler import scheduler_service
 
-app = FastAPI(title="Autonomous FPL Optimizer", version="1.0.0")
+app = FastAPI(title="Autonomous FPL Optimizer", version="1.1.0")
 
 BASE_DIR = Path(__file__).resolve().parent
 TEMPLATES_DIR = BASE_DIR / "templates"

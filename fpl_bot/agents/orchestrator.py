@@ -94,6 +94,7 @@ class Orchestrator:
             "fpl_connection": "OK",
             "team_id": settings.team_id,
             "team_name": entry.get("name", settings.team_name),
+            "version": settings.version,
             "manager_name": f"{entry.get('player_first_name')} {entry.get('player_last_name')}",
             "current_gw": gw_num,
             "deadline": deadline_str,

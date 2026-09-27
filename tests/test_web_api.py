@@ -12,7 +12,7 @@ def test_dashboard_html(client):
     response = client.get("/")
     assert response.status_code == 200
     assert "Overspent FC" in response.text
-    assert "6834344" in response.text
+    assert "Autonomous Expected Points Maximizer" in response.text
 
 
 def test_api_diagnostic(client):
@@ -21,6 +21,7 @@ def test_api_diagnostic(client):
     data = response.json()
     assert data["team_id"] == 6834344
     assert data["team_name"] == "Overspent FC"
+    assert data["version"] == "v1.1.0"
     assert data["fpl_connection"] == "OK"
 
 

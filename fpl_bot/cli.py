@@ -4,6 +4,7 @@ Supports diagnostic, optimize, backtest, audit, and server modes.
 """
 
 import sys
+import os
 import argparse
 from typing import Optional
 import uvicorn
@@ -149,6 +150,16 @@ def run_scheduled(stage: str = "auto", force: bool = False):
     print("Scheduled workflow execution summary:")
     for k, v in res.items():
         print(f"  {k}: {v}")
+
+    # Emit output for GitHub Actions runner to gate builds
+    gh_output = os.getenv("GITHUB_OUTPUT")
+    if gh_output:
+        try:
+            with open(gh_output, "a", encoding="utf-8") as f:
+                f.write(f"executed={str(res.get('executed', False)).lower()}\n")
+                f.write(f"stage={res.get('stage', 'none')}\n")
+        except Exception as e:
+            print(f"Warning: Failed to write to GITHUB_OUTPUT: {e}")
 
 
 def run_retrain(gameweek: Optional[int] = None):

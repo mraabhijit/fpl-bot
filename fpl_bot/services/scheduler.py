@@ -115,14 +115,38 @@ class DeadlineScheduler:
             })
         return jobs
 
+    def _is_matchday_or_settlement_window(self, gameweek_id: int) -> bool:
+        """
+        Evaluates whether current local time is within 00:00 IST on a matchday
+        or the day after a matchday (for bonus and autosubs calculation).
+        """
+        now_local = datetime.now(self.target_tz)
+        if now_local.hour != 0:
+            return False
+
+        try:
+            fixtures = self.api.get_fixtures()
+            target_dates = set()
+            for f in fixtures:
+                if f.get("event") in (gameweek_id, max(1, gameweek_id - 1)) and f.get("kickoff_time"):
+                    ko_utc = datetime.fromisoformat(f["kickoff_time"].replace("Z", "+00:00"))
+                    ko_date = ko_utc.astimezone(self.target_tz).date()
+                    target_dates.add(ko_date)
+                    target_dates.add(ko_date + timedelta(days=1))
+            return now_local.date() in target_dates
+        except Exception:
+            return False
+
     def check_and_run_scheduled_workflow(
         self,
         stage: str = "auto",
         force: bool = False
     ) -> Dict[str, Any]:
         """
-        Evaluates dynamic deadline timing against configured milestones
-        (T-24h, T-6h, T-3h, T-90m, T-30m, T-15m) for GitHub Actions automation.
+        Evaluates dynamic deadline timing against approved milestones:
+        1. T-3h transfer deadline milestone (150-210 mins before deadline).
+        2. Matchday at 00:00 IST and next day at 00:00 IST for bonus & autosubs.
+        Intermediate builds are eliminated.
         """
         from fpl_bot.agents.orchestrator import orchestrator
 
@@ -139,26 +163,39 @@ class DeadlineScheduler:
         active_stage = None
         # Detect active milestone if stage is auto
         if stage == "auto":
-            if mins_remaining < 0:
+            if force:
+                active_stage = "manual_trigger"
+            elif mins_remaining < 0:
                 active_stage = "post_deadline"
                 db.log_audit(gw_id, "DEADLINE_LOCKOUT", {"mins_past": abs(mins_remaining)}, "LOCKED")
-            elif 10 <= mins_remaining <= 20:
-                active_stage = "safety_check"      # T-15m
-            elif 20 < mins_remaining <= 45:
-                active_stage = "final_audit"       # T-30m
-            elif 75 <= mins_remaining <= 105:
-                active_stage = "lineup_check"      # T-90m
-            elif 165 <= mins_remaining <= 195:
-                active_stage = "primary"           # T-3h (User primary run)
-            elif 345 <= mins_remaining <= 375:
-                active_stage = "refresh"           # T-6h
-            elif 1410 <= mins_remaining <= 1470:
-                active_stage = "initial"           # T-24h
-            elif force:
-                active_stage = "manual_trigger"
+                return {
+                    "gameweek": gw_id,
+                    "gameweek_name": gw_info["name"],
+                    "deadline_local": gw_info["deadline_str"],
+                    "hours_remaining": round(hours_remaining, 2),
+                    "stage": "post_deadline",
+                    "executed": False,
+                    "status": "DEADLINE_LOCKOUT",
+                    "transaction_hash": None,
+                }
+            elif 150 <= mins_remaining <= 210:
+                # T-3h primary transfer deadline milestone
+                active_stage = "primary"
+            elif self._is_matchday_or_settlement_window(gw_id):
+                # 00:00 IST on matchday or day after for bonus & autosubs calculation
+                active_stage = "matchday_settlement"
             else:
-                # Routine refresh
-                active_stage = "routine_refresh"
+                # All intermediate builds eliminated: skip optimization and build
+                return {
+                    "gameweek": gw_id,
+                    "gameweek_name": gw_info["name"],
+                    "deadline_local": gw_info["deadline_str"],
+                    "hours_remaining": round(hours_remaining, 2),
+                    "stage": "none",
+                    "executed": False,
+                    "status": "SKIPPED_NO_BUILD_DUE",
+                    "transaction_hash": None,
+                }
         else:
             active_stage = stage
 
@@ -175,12 +212,9 @@ class DeadlineScheduler:
                 except Exception as e:
                     db.log_audit(prev_gw, "AUTO_SETTLEMENT_ERROR", {"error": str(e)}, "WARNING")
 
-        # Execute optimization cycle if not locked out
-        executed = False
-        rec = None
-        if active_stage != "post_deadline":
-            rec = orchestrator.run_optimization_cycle(stage=active_stage)
-            executed = True
+        # Execute optimization cycle
+        rec = orchestrator.run_optimization_cycle(stage=active_stage)
+        executed = True
 
         return {
             "gameweek": gw_id,

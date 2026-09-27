@@ -10,6 +10,30 @@ from fpl_bot.core.database import db
 from fpl_bot.services.fpl_api import fpl_api, FPLApiClient
 
 
+TEAM_NAME_MAP = {
+    1: {"name": "Arsenal", "short_name": "ARS"},
+    2: {"name": "Aston Villa", "short_name": "AVL"},
+    3: {"name": "Bournemouth", "short_name": "BOU"},
+    4: {"name": "Brentford", "short_name": "BRE"},
+    5: {"name": "Brighton", "short_name": "BHA"},
+    6: {"name": "Chelsea", "short_name": "CHE"},
+    7: {"name": "Crystal Palace", "short_name": "CRY"},
+    8: {"name": "Everton", "short_name": "EVE"},
+    9: {"name": "Fulham", "short_name": "FUL"},
+    10: {"name": "Ipswich", "short_name": "IPS"},
+    11: {"name": "Leicester", "short_name": "LEI"},
+    12: {"name": "Liverpool", "short_name": "LIV"},
+    13: {"name": "Man City", "short_name": "MCI"},
+    14: {"name": "Man Utd", "short_name": "MUN"},
+    15: {"name": "Newcastle", "short_name": "NEW"},
+    16: {"name": "Nott'm Forest", "short_name": "NFO"},
+    17: {"name": "Southampton", "short_name": "SOU"},
+    18: {"name": "Spurs", "short_name": "TOT"},
+    19: {"name": "West Ham", "short_name": "WHU"},
+    20: {"name": "Wolves", "short_name": "WOL"},
+}
+
+
 class TeamFormService:
     def __init__(self, api: Optional[FPLApiClient] = None):
         self.api = api or fpl_api
@@ -26,10 +50,24 @@ class TeamFormService:
         if not force_refresh and self._cached_team_form and (now - self._cache_timestamp < self._cache_ttl):
             return self._cached_team_form
 
+        # Resolve team names from bootstrap-static or fallback
+        team_meta_map = dict(TEAM_NAME_MAP)
+        try:
+            raw = self.api.get_bootstrap_static()
+            for t in raw.get("teams", []):
+                team_meta_map[t["id"]] = {
+                    "name": t.get("name") or TEAM_NAME_MAP.get(t["id"], {}).get("name", f"Team {t['id']}"),
+                    "short_name": t.get("short_name") or TEAM_NAME_MAP.get(t["id"], {}).get("short_name", f"T{t['id']}"),
+                }
+        except Exception:
+            pass
+
         # Initialize base containers for all 20 teams
         team_metrics: Dict[int, Dict[str, Any]] = {
             tid: {
                 "team_id": tid,
+                "team_name": team_meta_map.get(tid, {}).get("name", f"Team {tid}"),
+                "team_short_name": team_meta_map.get(tid, {}).get("short_name", f"T{tid}"),
                 "matches_evaluated": 0,
                 "goals_scored_rolling": 0,
                 "goals_conceded_rolling": 0,

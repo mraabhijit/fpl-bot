@@ -8,14 +8,24 @@ The system maximizes expected points over a rolling multi-gameweek horizon while
 
 ## Core Capabilities
 
-- Strategic Optimization Engine: Computes expected points (xP) using historical form, ICT index, fixture difficulty (FDR), home/away weighting, expected minutes, and injury risks.
-- Squad and Formation Legality: Enforces official FPL constraints: 15-player squad (2 GKP, 5 DEF, 5 MID, 3 FWD), max 3 players per club, budget limits, and valid formations (1 GKP, 3-5 DEF, 2-5 MID, 1-3 FWD).
-- Subs Lineup Sequence Optimization: Analyzes appearance probability and tactical autosub value to order the bench (Slot 12: Goalkeeper sub; Slots 13-15: Outfield subs in descending expected arrival value).
-- Chip Strategy Advisory: Evaluates high-leverage double gameweeks (DGW), blank gameweeks (BGW), and fixture swings to recommend Wildcard, Free Hit, Triple Captain, or Bench Boost only when expected value exceeds conservative thresholds.
-- Dual-Mode Web Dashboard: Interactive dashboard serving either live via FastAPI (`localhost:8000`) or statically on GitHub Pages. Features toggles between Recommended Squad (with winning simulation xP), Actual Squad (matchday points), and Model Predicted xP.
-- GitHub Actions Automation: Automated workflow evaluating deadline milestones (T-24h, T-6h, T-3h, T-90m, T-30m, T-15m) and routine refreshes every 30 minutes, deploying static dashboard updates to GitHub Pages.
-- Audit Trail and Governance: Logs all decisions, constraint validations, and execution attempts to SQLite with cryptographic transaction hashes and approval gates for hits and chips.
-- Historical Backtesting Engine: Evaluates algorithm decisions across previous gameweeks with zero lookahead bias against hold-squad baselines.
+- **Strategic Optimization Engine**: Solves integer programming formulations using PuLP to compute optimal transfers and starting lineups based on expected points (xP), fixture difficulty (FDR), home/away weighting, expected minutes, and injury risks.
+- **Squad and Formation Legality**: Enforces official FPL constraints: 15-player squad (2 GKP, 5 DEF, 5 MID, 3 FWD), max 3 players per club, budget limits, and valid formations (1 GKP, 3-5 DEF, 2-5 MID, 1-3 FWD).
+- **Subs Lineup Sequence Optimization**: Analyzes appearance probability and tactical autosub value to order the bench (Slot 12: Goalkeeper sub; Slots 13-15: Outfield subs in descending expected arrival value).
+- **Chip Strategy Advisory**: Evaluates high-leverage double gameweeks (DGW), blank gameweeks (BGW), and fixture swings to recommend Wildcard, Free Hit, Triple Captain, or Bench Boost only when expected value exceeds conservative thresholds. Unobtrusive tooltip popover (`ℹ️`) explains chip recommendations without cluttering the UI.
+- **Dual-Mode Web Dashboard**:
+  - **Dark & Light Mode**: Integrated theme toggle with `localStorage` persistence and automatic system preference detection.
+  - **Flat Modern Design**: Clean UI with fluid responsive layouts across desktop, tablet, and mobile screens.
+  - **Collapsible Sections**: Accordions with animated chevron indicators for **Audit Trail**, **Adaptive Multi-Factor Learning**, and **Historical Backtesting**.
+  - **Team Form Dynamics**: Real Premier League club names (`Arsenal`, `Man City`, etc.) resolved in rolling form attack/defense leaderboards.
+  - **Direct GitHub Actions Dispatch**: In-page "Run Optimizer" and "Run Backtest" buttons support ad-hoc workflow dispatching directly via GitHub REST API.
+  - **Dual Serving**: Host locally via FastAPI (`localhost:8000`) or view static deployment on GitHub Pages.
+- **Gated GitHub Actions Automation**: Replaced continuous intermediate builds with two focused milestones:
+  1. **T-3h Transfer Deadline Milestone**: Executes primary optimization 3 hours before gameweek deadline.
+  2. **00:00 IST Daily Matchday & Settlement**: Settle autosubs, calculate bonus points, and retrain adaptive learning residuals.
+  - Automated workflow skips redundant builds and static site deployments when no milestone is due.
+- **Adaptive Multi-Factor Learning**: Solves Ridge Regression over player form trajectories, team form dynamics, elite crowd consensus (League 314), and market momentum to correct model bias.
+- **Historical Backtesting Engine**: Evaluates algorithm decisions across previous gameweeks with zero lookahead bias against hold-squad baselines.
+- **Audit Trail & Governance**: Logs all decisions, constraint validations, and execution attempts to SQLite with cryptographic SHA-256 transaction hashes.
 
 ---
 
@@ -28,9 +38,13 @@ fpl-bot/
 ├── fpl_bot/
 │   ├── agents/
 │   │   ├── orchestrator.py    # Main workflow coordinator and stage controller
-│   │   ├── strategist.py      # Transfer, chip, and squad optimization algorithms
-│   │   ├── player_data.py     # Live FPL API client and statistical modeling
-│   │   └── executor.py        # Safe transfer and lineup submission engine
+│   │   ├── optimization_agent.py # Integer programming squad and transfer solver
+│   │   ├── projection_agent.py   # Multi-horizon expected points (xP) model
+│   │   ├── chip_agent.py         # Long-range chip valuation and timing engine
+│   │   ├── fixture_agent.py      # Fixture difficulty (FDR) and calendar analysis
+│   │   ├── availability_agent.py # Injury, suspension, and press conference tracker
+│   │   ├── rank_agent.py         # Mini-league and overall rank analytics
+│   │   └── deadline_auditor.py   # Pre-deadline sanity and constraint auditor
 │   ├── core/
 │   │   ├── config.py          # Configuration and environment settings
 │   │   ├── database.py        # SQLite persistence and audit logging
@@ -38,14 +52,22 @@ fpl-bot/
 │   │   └── backtest.py        # Historical backtesting simulation engine
 │   ├── services/
 │   │   ├── fpl_api.py         # Official Fantasy Premier League REST client
-│   │   ├── scheduler.py       # Dynamic deadline countdown scheduler
-│   │   └── static_export.py   # Static bundle generator for GitHub Pages
+│   │   ├── fpl_auth.py        # Authentication session management
+│   │   ├── scheduler.py       # Dynamic deadline countdown and milestone scheduler
+│   │   ├── differential_trainer.py # Adaptive Multi-Factor Ridge Regression
+│   │   ├── team_form_service.py    # Rolling team offensive & defensive form dynamics
+│   │   ├── consensus_service.py    # Elite manager crowd consensus (League 314)
+│   │   ├── settlement_service.py   # Matchday autosubs and bonus points settlement
+│   │   ├── static_export.py   # Static bundle generator for GitHub Pages
+│   │   ├── notification_service.py # System alerts and webhook notifications
+│   │   ├── transaction_service.py  # FPL live transfer and lineup submission
+│   │   └── player_data.py     # Player statistics and feature extraction
 │   ├── web/
 │   │   ├── app.py             # FastAPI REST endpoints
 │   │   └── templates/
-│   │       └── index.html     # Dual-mode responsive web dashboard
+│   │       └── index.html     # Dual-theme responsive web dashboard
 │   └── cli.py                 # Command line interface
-├── tests/                     # Unit and integration test suite
+├── tests/                     # Unit and integration test suite (34 tests)
 ├── main.py                    # Application entrypoint
 ├── pyproject.toml             # Package specification and dependencies
 └── README.md
@@ -145,10 +167,10 @@ python main.py export --output-dir dist
 ### 6. Scheduled Milestone Evaluation
 Evaluate distance to deadline and trigger stage optimization:
 ```bash
-# Automatic stage detection based on minutes remaining
+# Automatic stage detection based on milestones (T-3h or 00:00 IST settlement)
 python main.py scheduled --stage auto
 
-# Force execution regardless of deadline milestone
+# Force execution regardless of deadline timing
 python main.py scheduled --stage primary --force
 ```
 
@@ -163,14 +185,13 @@ python main.py differentials --gameweek 4
 ```
 
 Features incorporated in weekly retraining:
-- Historical Residual Prior: Empirical Bayes shrinkage over past gameweeks.
-- Player Form Trajectory: Form acceleration and goal involvement efficiency delta (GI vs xGI).
-- Team Form Dynamics: Rolling 3-match offensive potency and defensive fragility indices.
-- Elite Crowd Consensus: Effective ownership ($EO^{\text{elite}}$) and captaincy concentration among top overall managers in the world (League 314).
-- Market Transfer Momentum: Normalized net event transfer velocity from official telemetry.
+- **Historical Residual Prior**: Empirical Bayes shrinkage over past gameweeks.
+- **Player Form Trajectory**: Form acceleration and goal involvement efficiency delta (GI vs xGI).
+- **Team Form Dynamics**: Rolling 3-match offensive potency and defensive fragility indices with real club names.
+- **Elite Crowd Consensus**: Effective ownership ($EO^{\text{elite}}$) and captaincy concentration among top overall managers in the world (League 314).
+- **Market Transfer Momentum**: Normalized net event transfer velocity from official telemetry.
 
 All retrained checkpoints are bounded within $[-2.0, +2.0]$ points to prevent erratic swings while systematically correcting model bias. Retraining executes autonomously inside GitHub Actions runners during post-gameweek workflow runs, with model weights and the SQLite database cached across runs via `actions/cache@v4`.
-
 
 ---
 
@@ -180,15 +201,16 @@ The repository includes an automated workflow (`.github/workflows/optimizer.yml`
 
 ### Milestone Schedule
 
-The GitHub Actions workflow runs every 30 minutes (`cron: '*/30 * * * *'`) and matches the dynamic deadline countdown against configured milestones:
+The GitHub Actions workflow runs on an automated schedule:
+- **Daily 00:00 IST (`18:30 UTC`)**: Runs daily matchday and post-matchday settlement for autosubs, bonus points, and adaptive learning residual updates.
+- **Hourly Check (`0 * * * *`)**: Evaluates the upcoming gameweek deadline countdown and triggers the primary optimization cycle when within the **T-3h window** (150–210 minutes before deadline).
+- **Elimination of Intermediate Builds**: Outside of these milestones, execution is skipped (`executed: false`), bypassing redundant test runs and static site builds to conserve GitHub Actions minutes.
 
-- T-24h (Initial model run, initial squad review)
-- T-6h (Press conference updates, injury refresh)
-- T-3h (Primary decision run, hit/transfer recommendations)
-- T-90m (Early lineup leak monitoring)
-- T-30m (Final audit and safety verification)
-- T-15m (Emergency lockout safeguard)
-- Routine (Data synchronization and static dashboard build outside milestone windows)
+### Manual Workflow Dispatch
+
+Workflows can be manually triggered with custom inputs:
+- From the GitHub Actions UI: Go to **Actions** -> **Autonomous FPL Optimizer** -> **Run workflow**.
+- From the Dashboard: Click **Run Optimizer** or **Run Backtest** on the web page to trigger the workflow via the GitHub REST API.
 
 ### GitHub Pages Setup
 
@@ -199,7 +221,7 @@ The GitHub Actions workflow runs every 30 minutes (`cron: '*/30 * * * *'`) and m
    - `FPL_PASSWORD`
    - `FPL_TEAM_ID`
    - `FPL_EXECUTION_MODE` (`DRY_RUN` recommended)
-4. Push changes to `master` or trigger a manual run via the **Actions** tab using **Run workflow**.
+4. Push changes to `main` or trigger a manual run via the **Actions** tab.
 
 The dashboard will be published at `https://<your-username>.github.io/<repo-name>/`.
 
@@ -219,12 +241,13 @@ Test coverage includes:
 - Execution safety and role permissions
 - Scoring models and risk penalty functions
 - Subs lineup sequence priority
-- Static site exporter and scheduled workflow checks
+- Static site exporter and milestone gating logic
+- Responsive UI components, theme switching, and collapsible accordions
 
 ---
 
 ## Safety and Execution Policy
 
-- Default Dry-Run: The system defaults to `FPL_EXECUTION_MODE=DRY_RUN`. No live transfers or squad changes are submitted to the official FPL servers unless explicitly set to `LIVE`.
-- Approval Gates: Recommended transfers incurring point hits (-4, -8) or chip activations require affirmative approval before submission.
-- Cryptographic Audit Trail: Every recommendation and execution attempt generates a SHA-256 transaction hash stored in the SQLite database.
+- **Default Dry-Run**: The system defaults to `FPL_EXECUTION_MODE=DRY_RUN`. No live transfers or squad changes are submitted to the official FPL servers unless explicitly set to `LIVE`.
+- **Approval Gates**: Recommended transfers incurring point hits (-4, -8) or chip activations require affirmative approval before submission.
+- **Cryptographic Audit Trail**: Every recommendation and execution attempt generates a SHA-256 transaction hash stored in the SQLite database.

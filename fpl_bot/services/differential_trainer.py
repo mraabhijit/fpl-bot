@@ -475,6 +475,8 @@ class DifferentialTrainer:
                 "top_attack": [
                     {
                         "team_id": t["team_id"],
+                        "team_name": t.get("team_name", f"Team {t['team_id']}"),
+                        "team_short_name": t.get("team_short_name", f"T{t['team_id']}"),
                         "goals_scored_per_match": t["goals_scored_per_match"],
                         "momentum_index": t["attack_momentum_index"],
                     }
@@ -483,6 +485,8 @@ class DifferentialTrainer:
                 "top_defense": [
                     {
                         "team_id": t["team_id"],
+                        "team_name": t.get("team_name", f"Team {t['team_id']}"),
+                        "team_short_name": t.get("team_short_name", f"T{t['team_id']}"),
                         "goals_conceded_per_match": t["goals_conceded_per_match"],
                         "fragility_index": t["defense_fragility_index"],
                     }
