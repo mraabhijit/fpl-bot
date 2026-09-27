@@ -160,7 +160,18 @@ class BacktestingEngine:
 
         return result
 
-    def run_all_historical(self, up_to_gw: int = 4) -> List[BacktestResult]:
+    def get_latest_completed_gameweek(self) -> int:
+        try:
+            data = self.api.get_bootstrap_static()
+            events = data.get("events", [])
+            finished = [e["id"] for e in events if e.get("finished")]
+            return max(finished) if finished else 1
+        except Exception:
+            return 4
+
+    def run_all_historical(self, up_to_gw: Optional[int] = None) -> List[BacktestResult]:
+        if up_to_gw is None:
+            up_to_gw = self.get_latest_completed_gameweek()
         results = []
         for gw in range(2, up_to_gw + 1):
             try:

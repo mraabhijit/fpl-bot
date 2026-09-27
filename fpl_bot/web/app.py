@@ -106,7 +106,7 @@ async def get_backtests():
 @app.post("/api/backtests/run")
 async def run_backtests():
     try:
-        results = backtesting_engine.run_all_historical(up_to_gw=4)
+        results = backtesting_engine.run_all_historical()
         return JSONResponse([r.model_dump() for r in results])
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
