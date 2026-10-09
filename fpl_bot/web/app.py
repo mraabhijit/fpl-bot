@@ -17,7 +17,7 @@ from fpl_bot.core.backtest import backtesting_engine
 from fpl_bot.services.gameweek_view import gameweek_view_service
 from fpl_bot.services.scheduler import scheduler_service
 
-app = FastAPI(title="Autonomous FPL Optimizer", version="1.1.0")
+app = FastAPI(title="Autonomous FPL Optimizer", version=settings.version.lstrip("v"))
 
 BASE_DIR = Path(__file__).resolve().parent
 TEMPLATES_DIR = BASE_DIR / "templates"
