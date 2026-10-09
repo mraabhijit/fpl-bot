@@ -30,20 +30,18 @@ class NewsService:
             inj_risk = 1.0 if status == "i" else 0.0
             rot_risk = 0.0
         elif status == "d":
-            # Doubtful: check chance of playing
+            # Doubtful: FPL's chance of playing, or a coin flip if it gives none
             cop = player.chance_of_playing_next_round
-            if cop is not None:
-                avail_prob = cop / 100.0
-            else:
-                avail_prob = 0.5
+            avail_prob = cop / 100.0 if cop is not None else 0.5
             start_prob = avail_prob * 0.85
             min_prob = avail_prob * 0.80
             inj_risk = 1.0 - avail_prob
             rot_risk = 0.3
         else:
-            # Available ('a')
-            avail_prob = 1.0
-            inj_risk = 0.05
+            # Available ('a'): usually 100%, but FPL sometimes attaches a chance to an "available" player
+            cop = player.chance_of_playing_next_round
+            avail_prob = cop / 100.0 if cop is not None else 1.0
+            inj_risk = max(0.05, 1.0 - avail_prob)
             # Estimate start probability based on minutes played and appearances
             if player.minutes > 200:
                 start_prob = 0.92
@@ -57,6 +55,9 @@ class NewsService:
                 start_prob = 0.40
                 min_prob = 0.35
                 rot_risk = 0.60
+            # start/minutes chances are conditional on being fit
+            start_prob *= avail_prob
+            min_prob *= avail_prob
 
         # Adjust for key words in news
         lower_news = news.lower()

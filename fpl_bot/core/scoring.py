@@ -12,7 +12,7 @@ class ScoringEngine:
     def calculate_player_expected_points(
         player: Player,
         fixture_difficulty: float,
-        is_home: bool,
+        is_home: Optional[bool],
         availability: Optional[PlayerAvailability] = None
     ) -> float:
         """
@@ -22,7 +22,7 @@ class ScoringEngine:
         - Expected goal involvements (xG, xA)
         - Expected clean sheets (position-based)
         - Fixture difficulty adjustment
-        - Home advantage (~10% boost for attack, ~15% for defence)
+        - Home advantage (~10% boost for attack, ~15% for defence); ``is_home=None`` means unknown venue (neutral)
         - Availability / start probability
         """
         base_points = player.form if player.form > 0 else (player.points_per_game or 2.0)
@@ -36,12 +36,12 @@ class ScoringEngine:
         diff_mult = max(0.6, 1.0 + (3.0 - fixture_difficulty) * 0.15)
 
         # Home advantage
-        venue_mult = 1.10 if is_home else 0.95
+        venue_mult = 1.0 if is_home is None else (1.10 if is_home else 0.95)
 
         # Position specific clean sheet probability
         cs_factor = 0.0
         if player.element_type in (1, 2):  # GKP, DEF
-            cs_factor = 4.0 * max(0.1, (5.0 - fixture_difficulty) / 10.0) * (1.15 if is_home else 0.9)
+            cs_factor = 4.0 * max(0.1, (5.0 - fixture_difficulty) / 10.0) * (1.0 if is_home is None else (1.15 if is_home else 0.9))
         elif player.element_type == 3:  # MID
             cs_factor = 1.0 * max(0.1, (5.0 - fixture_difficulty) / 10.0)
 

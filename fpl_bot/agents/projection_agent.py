@@ -1,6 +1,9 @@
 """
 Projection Agent producing 1GW, 3GW, 5GW, and 8GW player projections.
 Section 6 of FPL-Optimizer.md.
+
+The next-gameweek number comes from the trained hybrid model (``forecast_service``), scaled by news
+availability. The legacy hand-tuned formula is kept only as a fallback if the model cannot be built.
 """
 
 from typing import Dict, List, Optional
@@ -17,7 +20,8 @@ class ProjectionAgent:
         player: Player,
         target_gameweek: int,
         fixture_score: FixtureScore,
-        availability: Optional[PlayerAvailability] = None
+        availability: Optional[PlayerAvailability] = None,
+        model_xp: Optional[float] = None,
     ) -> PlayerProjection:
         """
         Generates comprehensive point projections across 1, 3, 5, 8 GW horizons.
@@ -71,13 +75,18 @@ class ProjectionAgent:
         base_xp = self.scoring.calculate_player_expected_points(
             player=player,
             fixture_difficulty=estimated_diff,
-            is_home=True,  # Average or blended
+            is_home=None,  # venue unknown here; the trained model knows the real venue
             availability=availability
         )
+        if model_xp is not None:
+            # The model already prices in expected minutes; news only adds injury/suspension knowledge.
+            base_xp = round(model_xp * (availability.availability_probability if availability else 1.0), 2)
 
         # Calibrated differential adjustment from adaptive learning model
         delta = 0.0
         try:
+            if model_xp is not None:
+                raise LookupError("trained model supersedes the residual adjustment")
             from fpl_bot.services.differential_trainer import differential_trainer
             delta = differential_trainer.predict_adjustment(
                 player_id=player.id,
@@ -90,7 +99,7 @@ class ProjectionAgent:
             delta = 0.0
 
         # Calibrated expected points
-        xp_1gw = round(max(0.5, base_xp + delta), 2)
+        xp_1gw = round(max(0.0, base_xp + delta), 2)
 
         # Multi-Gameweek Horizon Projections
         # Scale with horizon fixture scores
@@ -131,6 +140,12 @@ class ProjectionAgent:
         fixture_scores: Dict[int, FixtureScore],
         availabilities: Dict[int, PlayerAvailability]
     ) -> Dict[int, PlayerProjection]:
+        model_xp: Dict[int, float] = {}
+        try:
+            from fpl_bot.services.forecast_service import forecast_service
+            model_xp = forecast_service.predict_gameweek(target_gameweek)
+        except Exception as exc:  # network/data failure: fall back to the legacy formula
+            print(f"[projection] trained model unavailable, using legacy formula: {exc}")
         projections = {}
         for p in players:
             f_score = fixture_scores.get(p.team_id) or FixtureScore(
@@ -141,7 +156,10 @@ class ProjectionAgent:
                 fixture_score_8gw=3.0
             )
             avail = availabilities.get(p.id)
-            projections[p.id] = self.generate_player_projection(p, target_gameweek, f_score, avail)
+            projections[p.id] = self.generate_player_projection(
+                p, target_gameweek, f_score, avail,
+                model_xp=(model_xp.get(p.id, 0.0) if model_xp else None),
+            )
         return projections
 
 
