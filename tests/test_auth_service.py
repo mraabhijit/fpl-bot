@@ -3,7 +3,10 @@ from pathlib import Path
 from fpl_bot.services.fpl_auth import FPLAuthService
 
 
-def test_auth_service_persistence(tmp_path: Path):
+def test_auth_service_persistence(tmp_path: Path, monkeypatch):
+    # Real tokens in a developer's .env must not leak into this test
+    monkeypatch.setattr("fpl_bot.services.fpl_auth.settings.fpl_access_token", "")
+    monkeypatch.setattr("fpl_bot.services.fpl_auth.settings.fpl_refresh_token", "")
     session_file = tmp_path / "session_test.json"
     service = FPLAuthService(session_path=session_file)
 

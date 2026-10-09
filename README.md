@@ -24,7 +24,9 @@ The system maximizes expected points over a rolling multi-gameweek horizon while
   2. **00:00 IST Daily Matchday & Settlement**: Settle autosubs, calculate bonus points, and retrain adaptive learning residuals.
   - Automated workflow skips redundant builds and static site deployments when no milestone is due.
 - **Adaptive Multi-Factor Learning**: Solves Ridge Regression over player form trajectories, team form dynamics, elite crowd consensus (League 314), and market momentum to correct model bias.
-- **Historical Backtesting Engine**: Evaluates algorithm decisions across previous gameweeks with zero lookahead bias against hold-squad baselines.
+- **Trained Points Model (hybrid)**: Gradient boosting over point-in-time features (rolling minutes, xG/xA/bonus/saves per 90, team attack/defence form, opponent strength, venue, double gameweeks) with a hand-built heuristic as one of its features and as the benchmark to beat. Trained on the vaastav/Fantasy-Premier-League seasons plus the current season from the FPL API; news (injury/suspension) availability is applied on top at prediction time.
+- **Integer-Programming Squad Optimizer**: A PuLP/CBC model picks the squad, XI, and captain together (budget, 2/5/5/3, max 3 per club, legal formations) and prices extra transfers at -4 each, so it chooses 0..N transfers and any hits on net expected gain. The same solver builds a fresh £100m squad for GW1 / Wildcard / Free Hit.
+- **Walk-Forward Backtesting Engine**: Each gameweek the model is refit only on earlier gameweeks, the bot plays its own squad (free transfers, hits, captaincy, autosubs) against the real outcome, and prediction error is reported against baselines. See `python main.py backtest --season 2025-26`.
 - **Audit Trail & Governance**: Logs all decisions, constraint validations, and execution attempts to SQLite with cryptographic SHA-256 transaction hashes.
 
 ---
@@ -39,7 +41,7 @@ fpl-bot/
 │   ├── agents/
 │   │   ├── orchestrator.py    # Main workflow coordinator and stage controller
 │   │   ├── optimization_agent.py # Integer programming squad and transfer solver
-│   │   ├── projection_agent.py   # Multi-horizon expected points (xP) model
+│   │   ├── projection_agent.py   # Next-GW expected points (trained model via forecast_service) + legacy fallback
 │   │   ├── chip_agent.py         # Long-range chip valuation and timing engine
 │   │   ├── fixture_agent.py      # Fixture difficulty (FDR) and calendar analysis
 │   │   ├── availability_agent.py # Injury, suspension, and press conference tracker
@@ -146,10 +148,12 @@ python main.py optimize
 ```
 
 ### 3. Historical Backtesting
-Run zero-leakage simulation across past gameweeks to verify strategy performance against squad-hold baseline:
+Run a walk-forward simulation of the current season (stored in the dashboard) or validate on a completed past season (needs no FPL API):
 ```bash
-python main.py backtest
+python main.py backtest                    # current season so far, compared with your real points
+python main.py backtest --season 2025-26   # model vs heuristic vs form baselines: points, MAE, RMSE, Spearman
 ```
+Season totals from a single simulated season are noisy (a few hundred points depending on retrain schedule); prefer the prediction-error columns and compare across seasons.
 
 ### 4. Local Web Server
 Launch the FastAPI web dashboard with live auto-refresh:

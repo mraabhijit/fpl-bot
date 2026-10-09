@@ -4,7 +4,7 @@ Enforces caching to prevent rate limiting (Section 3).
 """
 
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 import httpx
 from fpl_bot.core.config import settings
 from fpl_bot.services.fpl_auth import auth_service, FPLAuthService
