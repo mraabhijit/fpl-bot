@@ -14,7 +14,8 @@ from fpl_bot.core.features import feature_columns
 
 
 class PointsModel:
-    def __init__(self, params: Optional[Dict] = None):
+    def __init__(self, params: Optional[Dict] = None, exclude_prefixes: tuple = ()):
+        self.exclude_prefixes = exclude_prefixes
         self.params = params or dict(
             loss="squared_error", learning_rate=0.04, max_iter=350, max_depth=5,
             min_samples_leaf=60, l2_regularization=2.0, random_state=0,
@@ -25,7 +26,7 @@ class PointsModel:
     def fit(self, feats: pd.DataFrame) -> "PointsModel":
         """Fit on played rows of a ``build_features`` frame."""
         train = feats[feats["played"]]
-        self.columns = feature_columns(train)
+        self.columns = feature_columns(train, self.exclude_prefixes)
         self.model = HistGradientBoostingRegressor(**self.params)
         self.model.fit(train[self.columns], train["total_points"])
         return self
