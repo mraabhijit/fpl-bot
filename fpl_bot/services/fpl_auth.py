@@ -20,6 +20,7 @@ class FPLAuthService:
         self.client_id = settings.auth_client_id
         self._access_token: Optional[str] = None
         self._refresh_token: Optional[str] = None
+        self.last_refresh_error: Optional[str] = None  # why the last refresh failed; never contains tokens
         self._load_session()
 
     def _load_session(self):
@@ -63,7 +64,9 @@ class FPLAuthService:
 
     def refresh(self) -> bool:
         """Refreshes access token using OAuth refresh_token grant if available."""
+        self.last_refresh_error = None
         if not self._refresh_token:
+            self.last_refresh_error = "no refresh token configured"
             return False
 
         try:
@@ -77,16 +80,27 @@ class FPLAuthService:
                     },
                     headers={"Content-Type": "application/x-www-form-urlencoded"}
                 )
-                if res.status_code == 200:
-                    data = res.json()
-                    new_token = data.get("access_token")
-                    new_refresh = data.get("refresh_token", self._refresh_token)
-                    if new_token:
-                        self._save_session(new_token, new_refresh)
-                        return True
-        except Exception:
-            pass
-        return False
+        except Exception as exc:
+            self.last_refresh_error = f"request failed ({type(exc).__name__})"
+            return False
+
+        try:
+            data = res.json()
+        except ValueError:
+            data = {}
+        if res.status_code != 200:
+            # OAuth error fields are short codes like invalid_grant; the token itself is never echoed
+            code = data.get("error") if isinstance(data.get("error"), str) else None
+            desc = data.get("error_description") if isinstance(data.get("error_description"), str) else None
+            detail = ": ".join(x for x in (code, desc) if x)
+            self.last_refresh_error = f"HTTP {res.status_code} from {self.token_endpoint}" + (f" ({detail[:200]})" if detail else "")
+            return False
+        new_token = data.get("access_token")
+        if not new_token:
+            self.last_refresh_error = f"HTTP 200 but no access_token in response (keys: {sorted(data)})"
+            return False
+        self._save_session(new_token, data.get("refresh_token", self._refresh_token))
+        return True
 
     def validate_session(self, team_id: Optional[int] = None) -> Tuple[bool, str]:
         """
@@ -111,7 +125,8 @@ class FPLAuthService:
                         res2 = client.get(url, headers=self.get_auth_headers())
                         if res2.status_code == 200:
                             return True, "Session refreshed and authorized"
-                    return False, f"Session expired or unauthorized (status {res.status_code})"
+                    why = f"; refresh failed: {self.last_refresh_error}" if self.last_refresh_error else ""
+                    return False, f"Session expired or unauthorized (status {res.status_code}){why}"
                 else:
                     return False, f"Unexpected response validating session (status {res.status_code})"
         except Exception as e:
