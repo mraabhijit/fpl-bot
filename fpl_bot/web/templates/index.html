@@ -1688,6 +1688,7 @@
                 document.getElementById('val-points').textContent = diag.overall_points || '0';
                 document.getElementById('val-bank').textContent = diag.bank || '£0.0m';
                 document.getElementById('val-squad').textContent = diag.team_value || '£100.0m';
+                if (diag.sell_value) document.getElementById('val-squad-sub').textContent = `Sells for ${diag.sell_value}`;
                 document.getElementById('val-ft').textContent = `Free Transfers: ${diag.free_transfers}`;
                 document.getElementById('val-deadline').innerHTML = formatDeadlineCard(diag.deadline_ist || diag.deadline);
 
