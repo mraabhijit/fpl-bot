@@ -1334,6 +1334,7 @@
                                 <button id="btn-actual-pts" class="btn-toggle active" onclick="switchActualSubMode('actual')">Actual Points</button>
                                 <button id="btn-actual-pred" class="btn-toggle" onclick="switchActualSubMode('pred')">Model Predicted</button>
                             </div>
+                            <select id="gw-select" class="btn" style="display: none; padding: 4px 8px; font-size: 12px; background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer;" aria-label="Gameweek" onchange="selectGameweek(Number(this.value))"></select>
                         </div>
                         <span id="rec-xp-badge" style="font-size: 13px; font-weight: 700; color: var(--pl-green);">Projected XP: ...</span>
                     </div>
@@ -1744,9 +1745,45 @@
                 loadAudits();
                 loadBacktests();
                 loadDifferentials();
+                loadGameweekIndex();
             } catch (err) {
                 console.error("Failed loading data:", err);
             }
+        }
+
+        let gwIndex = null;
+        let selectedGw = null;
+        const gwViews = {};
+
+        async function loadGameweekIndex() {
+            try {
+                const res = await apiFetch('/api/gameweeks');
+                if (!res.ok) return;
+                gwIndex = await res.json();
+                const sel = document.getElementById('gw-select');
+                const label = { finished: 'finished', live: 'live', upcoming: 'upcoming' };
+                sel.innerHTML = gwIndex.gameweeks
+                    .map(g => `<option value="${g.id}">GW${g.id} · ${label[g.status] || g.status}</option>`).join('');
+                await selectGameweek(gwIndex.default);
+            } catch (err) {
+                console.error('Gameweek selector unavailable:', err);
+            }
+        }
+
+        async function selectGameweek(gw) {
+            const sel = document.getElementById('gw-select');
+            if (sel) sel.value = String(gw);
+            if (!gwViews[gw]) {
+                const res = await apiFetch(`/api/gameweek/${gw}`);
+                if (!res.ok) return;
+                gwViews[gw] = await res.json();
+            }
+            selectedGw = gw;
+            renderTeamView();
+        }
+
+        function selectedGwView() {
+            return selectedGw !== null ? gwViews[selectedGw] : null;
         }
 
         function switchTeamView(mode) {
@@ -1759,10 +1796,14 @@
                 btnRec.classList.add('active');
                 btnCurr.classList.remove('active');
                 if (subToggle) subToggle.style.display = 'none';
+                const gwSel = document.getElementById('gw-select');
+                if (gwSel) gwSel.style.display = 'none';
             } else {
                 btnCurr.classList.add('active');
                 btnRec.classList.remove('active');
                 if (subToggle) subToggle.style.display = 'flex';
+                const gwSel = document.getElementById('gw-select');
+                if (gwSel && gwIndex) gwSel.style.display = '';
             }
             renderTeamView();
         }
@@ -1854,7 +1895,8 @@
             if (!currentRec) return;
 
             const isRec = currentViewMode === 'rec';
-            const teamData = isRec ? currentRec.recommended_team : currentRec.current_team;
+            const gwView = isRec ? null : selectedGwView();
+            const teamData = isRec ? currentRec.recommended_team : (gwView ? gwView.team : currentRec.current_team);
             
             // Update title and XP badge
             const titleEl = document.getElementById('lineup-title');
@@ -1913,7 +1955,17 @@
                     }
                 } else {
                     const gwNum = teamData.gameweek || 4;
-                    if (currentActualSubMode === 'pred') {
+                    const gwStatus = gwView ? gwView.status : null;
+                    if (gwView && currentActualSubMode === 'pred' && !gwView.has_prediction) {
+                        titleEl.textContent = `Actual Team — GW${gwNum} (${teamData.formation || '3-4-3'})`;
+                        badgeEl.textContent = `No stored prediction for GW${gwNum}`;
+                    } else if (gwStatus === 'upcoming' && currentActualSubMode === 'actual') {
+                        titleEl.textContent = `Actual Team — GW${gwNum} (${teamData.formation || '3-4-3'})`;
+                        badgeEl.textContent = `GW${gwNum} has not started: no points yet` + (gwView.source === 'public-estimate' ? ' (lineup estimated)' : '');
+                    } else if (gwStatus === 'live' && currentActualSubMode === 'actual') {
+                        titleEl.textContent = `Actual Team — GW${gwNum} (${teamData.formation || '3-4-3'})`;
+                        badgeEl.textContent = `Live: ${isBenchBoost ? totalWithBench : xiXp} pts so far`;
+                    } else if (currentActualSubMode === 'pred') {
                         titleEl.textContent = `Actual Team — GW${gwNum} (${teamData.formation || '3-4-3'})`;
                         if (isBenchBoost) {
                             badgeEl.textContent = `Model Projected: ${totalWithBench} pts (Hold Strategy - Bench Boost: XI ${xiXp} + Bench ${benchXp})`;
@@ -1976,7 +2028,11 @@
                     pointsBadge = `<div class="p-xp" title="Expected Points">${player.expected_points} xP</div>`;
                 }
             } else {
-                if (actualSubMode === 'pred') {
+                if (actualSubMode === 'pred' && player.expected_points === null) {
+                    pointsBadge = `<div class="p-xp" title="No stored prediction for this gameweek">—</div>`;
+                } else if (actualSubMode !== 'pred' && player.points_state === 'upcoming') {
+                    pointsBadge = `<div class="p-actual" title="Gameweek not started">—</div>`;
+                } else if (actualSubMode === 'pred') {
                     if (isCap) {
                         const predXp = player.predicted_points !== undefined ? player.predicted_points : (player.expected_points * 2).toFixed(1);
                         pointsBadge = `<div class="p-xp cap" title="Model Predicted Captaincy (2x ${player.expected_points} xP)">${predXp} xP</div>`;
@@ -1994,6 +2050,8 @@
                     } else {
                         pointsBadge = `<div class="p-actual" title="Actual Gameweek Points">${pts} pts</div>`;
                     }
+                    if (player.points_state === 'pending') pointsBadge += `<div style="font-size: 10px; color: var(--text-secondary);">yet to play</div>`;
+                    else if (player.points_state === 'live') pointsBadge += `<div style="font-size: 10px; color: var(--accent-yellow);">in play</div>`;
                 }
             }
 
