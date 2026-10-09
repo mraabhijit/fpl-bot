@@ -249,6 +249,23 @@
             margin-bottom: 16px;
         }
 
+        .freshness {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px 14px;
+            align-items: center;
+            font-size: 12.5px;
+            color: var(--text-secondary);
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 8px 14px;
+            margin-bottom: 16px;
+        }
+        .freshness.warn { border-color: var(--accent-yellow); color: var(--text-primary); }
+        .freshness .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--pl-green); flex: none; }
+        .freshness.warn .dot { background: var(--accent-yellow); }
+
         .stat-card {
             background-color: var(--bg-secondary);
             border: 1px solid var(--border-color);
@@ -1262,6 +1279,12 @@
             </div>
         </header>
 
+        <div class="freshness" id="freshness" style="display: none;" role="status">
+            <span class="dot"></span>
+            <span id="freshness-age"></span>
+            <span id="freshness-note"></span>
+        </div>
+
         <!-- Stats Overview -->
         <div class="grid-stats">
             <div class="stat-card">
@@ -1620,6 +1643,25 @@
             }
         }
 
+        const STALE_AFTER_HOURS = 6;
+        function renderFreshness(diag) {
+            const el = document.getElementById('freshness');
+            if (!el || !diag.generated_at) return;   // older exports carry no timestamp
+            const ageHours = (Date.now() - new Date(diag.generated_at).getTime()) / 3600000;
+            const stale = ageHours > STALE_AFTER_HOURS;
+            const ageText = ageHours < 1 ? `${Math.max(1, Math.round(ageHours * 60))} min ago`
+                : ageHours < 48 ? `${Math.round(ageHours)} h ago` : `${Math.round(ageHours / 24)} days ago`;
+            document.getElementById('freshness-age').textContent =
+                `Updated ${ageText}` + (diag.data_as_of_gw ? ` · results through GW${diag.data_as_of_gw}` : '');
+            const notes = [];
+            if (stale) notes.push('This page is out of date; re-run the optimizer for current data.');
+            if (diag.squad_source === 'public-estimate')
+                notes.push('Free transfers, bank and selling prices are estimated from public history.');
+            document.getElementById('freshness-note').textContent = notes.join(' ');
+            el.classList.toggle('warn', stale || notes.length > 0);
+            el.style.display = 'flex';
+        }
+
         function formatDeadlineCard(val) {
             if (!val || val === 'N/A') return 'N/A';
             let dateStr = '';
@@ -1685,9 +1727,11 @@
                     if (invSubEl) invSubEl.textContent = '';
                 }
 
+                renderFreshness(diag);
                 document.getElementById('val-points').textContent = diag.overall_points || '0';
                 document.getElementById('val-bank').textContent = diag.bank || '£0.0m';
                 document.getElementById('val-squad').textContent = diag.team_value || '£100.0m';
+                if (diag.sell_value) document.getElementById('val-squad-sub').textContent = `Sells for ${diag.sell_value}`;
                 document.getElementById('val-ft').textContent = `Free Transfers: ${diag.free_transfers}`;
                 document.getElementById('val-deadline').innerHTML = formatDeadlineCard(diag.deadline_ist || diag.deadline);
 

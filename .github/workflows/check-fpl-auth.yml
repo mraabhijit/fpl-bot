@@ -1,0 +1,29 @@
+name: Check FPL auth
+
+# Manual only. The access token lives for one hour, so this cannot be a PR gate: it would be red
+# almost every time. Paste fresh tokens into the repo secrets, then run this to confirm they work.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: FPL secrets are valid
+    runs-on: ubuntu-latest
+    env:
+      FPL_ACCESS_TOKEN: ${{ secrets.FPL_ACCESS_TOKEN }}
+      FPL_REFRESH_TOKEN: ${{ secrets.FPL_REFRESH_TOKEN }}
+      FPL_TEAM_ID: ${{ secrets.FPL_TEAM_ID || '6834344' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: |
+          python -m pip install --upgrade pip
+          pip install .
+      - name: Check tokens (read-only, never refreshes)
+        run: python scripts/check_secrets.py

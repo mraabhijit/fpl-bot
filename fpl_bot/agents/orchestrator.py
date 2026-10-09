@@ -3,7 +3,7 @@ Orchestrator coordinating all specialized agents, data flows, permissions, and e
 Section 2 of FPL-Optimizer.md.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 import zoneinfo
 from fpl_bot.core.config import settings
@@ -48,6 +48,19 @@ class Orchestrator:
                 if (key, half) not in used:
                     available.append(f"{label} {half}")
         return available
+
+    @staticmethod
+    def _squad_values(current_squad: CurrentSquad, authenticated: bool = True) -> Dict[str, Optional[str]]:
+        """
+        FPL's "squad value" is the sum of current market prices. What you would actually get for selling the
+        squad is lower (half of any price rise is kept by FPL), and that is what the transfer budget uses.
+        Real selling prices need an authenticated session; without one they are unknown, so none is shown.
+        """
+        market = sum(p.player.now_cost for p in current_squad.picks if p.player)
+        return {
+            "team_value": f"£{market / 10:.1f}m",
+            "sell_value": f"£{current_squad.value / 10:.1f}m" if authenticated else None,
+        }
 
     def run_diagnostic(self) -> Dict[str, Any]:
         """
@@ -120,7 +133,7 @@ class Orchestrator:
             "overall_points": latest_history.get("total_points", entry.get("summary_overall_points", 0)),
             "invitation_leagues": invitation_leagues,
             "primary_invitation_league": primary_inv,
-            "team_value": f"£{current_squad.value / 10:.1f}m",
+            **self._squad_values(current_squad, authenticated=bool(auth_valid)),
             "bank": f"£{current_squad.bank / 10:.1f}m",
             "free_transfers": current_squad.free_transfers,
             "current_xi": [
@@ -138,10 +151,14 @@ class Orchestrator:
                 f"{lg.get('name')} (Rank: {lg.get('entry_rank')})" for lg in classic_leagues[:6]
             ],
             "authenticated_write_access": "YES" if auth_valid else "NO",
-            "data_source_warning": None if auth_valid else (
-                "Not authenticated: using public data. Selling prices, bank and free transfers are estimates "
-                "(free transfers assumed 1). Set FPL_ACCESS_TOKEN / FPL_REFRESH_TOKEN."
+            "squad_source": current_squad.source,
+            "data_source_warning": None if current_squad.source == "my-team" else (
+                "Squad state (free transfers, bank, selling prices) is estimated from public FPL history because "
+                "no valid token is available. FPL top-ups that never appear in history are invisible; paste a fresh "
+                "access token for exact values."
             ),
+            "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "data_as_of_gw": max((gw.id for gw in gameweeks if gw.finished), default=0),
             "execution_mode": settings.execution_mode,
         }
 

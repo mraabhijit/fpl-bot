@@ -28,7 +28,7 @@ STAT_COLUMNS = [
 ]
 COLUMNS = [
     "season", "season_idx", "name", "position", "team", "opp", "round", "fixture",
-    "was_home", "kickoff", "value", "team_goals", "opp_goals", "ep", "played",
+    "was_home", "kickoff", "value", "team_goals", "opp_goals", "ep", "fdr", "played",
 ] + STAT_COLUMNS
 
 
@@ -53,6 +53,10 @@ def load_vaastav_season(season: str, refresh: bool = False) -> pd.DataFrame:
     gws = pd.read_csv(StringIO(_fetch(f"{base}/gws/merged_gw.csv", CACHE_DIR / f"{season}_merged_gw.csv", refresh)))
     teams = pd.read_csv(StringIO(_fetch(f"{base}/teams.csv", CACHE_DIR / f"{season}_teams.csv", refresh)))
     team_names = dict(zip(teams["id"], teams["name"]))
+    fx = pd.read_csv(
+        StringIO(_fetch(f"{base}/fixtures.csv", CACHE_DIR / f"{season}_fixtures.csv", refresh)),
+        usecols=["id", "team_h_difficulty", "team_a_difficulty"],
+    ).set_index("id")
 
     was_home = gws["was_home"].astype(str).str.lower().eq("true")
     out = pd.DataFrame({
@@ -70,6 +74,8 @@ def load_vaastav_season(season: str, refresh: bool = False) -> pd.DataFrame:
         "team_goals": np.where(was_home, gws["team_h_score"], gws["team_a_score"]),
         "opp_goals": np.where(was_home, gws["team_a_score"], gws["team_h_score"]),
         "ep": gws["xP"],
+        # FPL's own difficulty for the player's side; the vaastav file is an end-of-season snapshot
+        "fdr": np.where(was_home, gws["fixture"].map(fx["team_h_difficulty"]), gws["fixture"].map(fx["team_a_difficulty"])),
         "played": True,
         "minutes": gws["minutes"],
         "starts": gws["starts"],
@@ -177,6 +183,7 @@ def load_current_season(
                     "team_goals": tg if finished else np.nan,
                     "opp_goals": og if finished else np.nan,
                     "ep": np.nan,
+                    "fdr": fx.get("team_h_difficulty" if was_home else "team_a_difficulty"),
                     "played": obs is not None,
                     "minutes": obs.get("minutes", 0.0) if obs else np.nan,
                     "starts": obs.get("starts", float(obs.get("minutes", 0) > 0)) if obs else np.nan,

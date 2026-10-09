@@ -6,6 +6,7 @@ from typing import Dict, List, Optional, Tuple
 from fpl_bot.core.config import settings
 from fpl_bot.core.models import Player, Team, Gameweek, SquadPick, CurrentSquad
 from fpl_bot.services.fpl_api import fpl_api, FPLApiClient
+from fpl_bot.services.public_squad import estimate_squad_state
 
 
 class PlayerDataService:
@@ -171,47 +172,41 @@ class PlayerDataService:
             except Exception:
                 pass
 
-        # Public picks fallback
+        # Public fallback: rebuild bank, free transfers and selling prices from public history
         picks_resp = self.api.get_entry_picks(picks_gw, tid)
-        entry_hist = picks_resp.get("entry_history", {})
-        picks_list = picks_resp.get("picks", [])
-        active_chip = picks_resp.get("active_chip")
-
-        # Determine free transfers from history & transfers
         entry_history = self.api.get_entry_history(tid)
-        current_history = entry_history.get("current", [])
-        
-        # Free transfers calculation (2024+ rules: 1 per GW, accumulates up to 5)
-        # We also check if transfers were already made this week
-        transfers_made = entry_hist.get("event_transfers", 0)
-        # Default estimation: 1 FT available for upcoming GW if none saved, or compute from history
-        free_transfers = 1
-
-        picks: List[SquadPick] = []
-        for p in picks_list:
-            el_id = p["element"]
-            cost = players_map[el_id].now_cost if el_id in players_map else 0
-            picks.append(SquadPick(
-                element_id=el_id,
+        raw = self.api.get_bootstrap_static()
+        target_gw = next_gw.id if next_gw else picks_gw + 1
+        state = estimate_squad_state(
+            picks=picks_resp.get("picks", []),
+            history_current=entry_history.get("current", []),
+            chips=entry_history.get("chips", []),
+            transfers=self.api.get_entry_transfers(tid),
+            elements={e["id"]: e for e in raw["elements"]},
+            picks_gw=picks_gw,
+            target_gw=target_gw,
+        )
+        picks: List[SquadPick] = [
+            SquadPick(
+                element_id=p["element"],
                 position=p["position"],
                 is_captain=p.get("is_captain", False),
                 is_vice_captain=p.get("is_vice_captain", False),
                 multiplier=p.get("multiplier", 1),
-                selling_price=cost,
-                purchase_price=cost,
-                player=players_map.get(el_id)
-            ))
-
-        bank = entry_hist.get("bank", 0)
-        val = entry_hist.get("value", 1000)
-
+                selling_price=p["selling_price"],
+                purchase_price=p["purchase_price"],
+                player=players_map.get(p["element"]),
+            )
+            for p in state["picks"]
+        ]
         return CurrentSquad(
             event=picks_gw,
             picks=picks,
-            bank=bank,
-            value=val,
-            free_transfers=free_transfers,
-            active_chip=active_chip
+            bank=state["bank"],
+            value=sum(p.selling_price or 0 for p in picks),
+            free_transfers=state["free_transfers"],
+            active_chip=picks_resp.get("active_chip"),
+            source="public-estimate",
         )
 
 

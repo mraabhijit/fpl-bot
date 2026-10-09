@@ -27,7 +27,8 @@ def run_diagnostic():
     print("")
     print(f"OVERALL RANK: {diag['overall_rank']:,}")
     print(f"OVERALL POINTS: {diag['overall_points']}")
-    print(f"TEAM VALUE: {diag['team_value']}")
+    sells = f" (sells for {diag['sell_value']})" if diag.get("sell_value") else ""
+    print(f"SQUAD VALUE: {diag['team_value']}{sells}")
     print(f"BANK: {diag['bank']}")
     print(f"FREE TRANSFERS: {diag['free_transfers']}")
     print("")

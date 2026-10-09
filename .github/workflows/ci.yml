@@ -31,24 +31,3 @@ jobs:
         run: pytest -q
       - name: Backtest smoke test (public vaastav data, no secrets)
         run: python main.py backtest --season 2025-26
-
-  secrets-check:
-    name: FPL secrets are valid
-    runs-on: ubuntu-latest
-    # Fork PRs cannot read secrets, so the check is skipped there instead of failing
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    env:
-      FPL_ACCESS_TOKEN: ${{ secrets.FPL_ACCESS_TOKEN }}
-      FPL_REFRESH_TOKEN: ${{ secrets.FPL_REFRESH_TOKEN }}
-      FPL_TEAM_ID: ${{ secrets.FPL_TEAM_ID || '6834344' }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-          cache: pip
-      - run: |
-          python -m pip install --upgrade pip
-          pip install .
-      - name: Check tokens (read-only, never refreshes)
-        run: python scripts/check_secrets.py
