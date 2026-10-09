@@ -3,7 +3,7 @@ Orchestrator coordinating all specialized agents, data flows, permissions, and e
 Section 2 of FPL-Optimizer.md.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 import zoneinfo
 from fpl_bot.core.config import settings
@@ -138,10 +138,14 @@ class Orchestrator:
                 f"{lg.get('name')} (Rank: {lg.get('entry_rank')})" for lg in classic_leagues[:6]
             ],
             "authenticated_write_access": "YES" if auth_valid else "NO",
-            "data_source_warning": None if auth_valid else (
-                "Not authenticated: using public data. Selling prices, bank and free transfers are estimates "
-                "(free transfers assumed 1). Set FPL_ACCESS_TOKEN / FPL_REFRESH_TOKEN."
+            "squad_source": current_squad.source,
+            "data_source_warning": None if current_squad.source == "my-team" else (
+                "Squad state (free transfers, bank, selling prices) is estimated from public FPL history because "
+                "no valid token is available. FPL top-ups that never appear in history are invisible; paste a fresh "
+                "access token for exact values."
             ),
+            "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "data_as_of_gw": max((gw.id for gw in gameweeks if gw.finished), default=0),
             "execution_mode": settings.execution_mode,
         }
 

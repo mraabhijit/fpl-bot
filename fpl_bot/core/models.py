@@ -105,6 +105,7 @@ class CurrentSquad(BaseModel):
     value: int  # in 10ths (e.g. 1006 = 100.6m)
     free_transfers: int
     active_chip: Optional[str] = None
+    source: str = "my-team"  # "my-team" (authenticated, exact) or "public-estimate" (rebuilt from public history)
 
 
 class PlayerProjection(BaseModel):
