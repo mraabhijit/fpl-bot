@@ -138,6 +138,10 @@ class Orchestrator:
                 f"{lg.get('name')} (Rank: {lg.get('entry_rank')})" for lg in classic_leagues[:6]
             ],
             "authenticated_write_access": "YES" if auth_valid else "NO",
+            "data_source_warning": None if auth_valid else (
+                "Not authenticated: using public data. Selling prices, bank and free transfers are estimates "
+                "(free transfers assumed 1). Set FPL_ACCESS_TOKEN / FPL_REFRESH_TOKEN."
+            ),
             "execution_mode": settings.execution_mode,
         }
 
