@@ -1,6 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from fpl_bot.web.app import app
+from fpl_bot.core.config import settings
 
 
 @pytest.fixture
@@ -21,7 +22,7 @@ def test_api_diagnostic(client):
     data = response.json()
     assert data["team_id"] == 6834344
     assert data["team_name"] == "Overspent FC"
-    assert data["version"] == "v1.1.0"
+    assert data["version"] == settings.version
     assert data["fpl_connection"] == "OK"
 
 
