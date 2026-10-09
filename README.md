@@ -15,7 +15,7 @@ The system maximizes expected points over a rolling multi-gameweek horizon while
 - **Dual-Mode Web Dashboard**:
   - **Dark & Light Mode**: Integrated theme toggle with `localStorage` persistence and automatic system preference detection.
   - **Flat Modern Design**: Clean UI with fluid responsive layouts across desktop, tablet, and mobile screens.
-  - **Collapsible Sections**: Accordions with animated chevron indicators for **Audit Trail**, **Adaptive Multi-Factor Learning**, and **Historical Backtesting**.
+  - **Collapsible Sections**: Accordions with animated chevron indicators for **Audit Trail** and **Historical Backtesting**.
   - **Team Form Dynamics**: Real Premier League club names (`Arsenal`, `Man City`, etc.) resolved in rolling form attack/defense leaderboards.
   - **Direct GitHub Actions Dispatch**: In-page "Run Optimizer" and "Run Backtest" buttons support ad-hoc workflow dispatching directly via GitHub REST API.
   - **Dual Serving**: Host locally via FastAPI (`localhost:8000`) or view static deployment on GitHub Pages.
@@ -23,7 +23,7 @@ The system maximizes expected points over a rolling multi-gameweek horizon while
   1. **T-3h Transfer Deadline Milestone**: Executes primary optimization 3 hours before gameweek deadline.
   2. **00:00 IST Daily Matchday & Settlement**: Settle autosubs, calculate bonus points, and retrain adaptive learning residuals.
   - Automated workflow skips redundant builds and static site deployments when no milestone is due.
-- **Adaptive Multi-Factor Learning**: Solves Ridge Regression over player form trajectories, team form dynamics, elite crowd consensus (League 314), and market momentum to correct model bias.
+- **Adaptive Multi-Factor Learning** (CLI only; not shown on the dashboard and no longer applied to predictions, which now come from the trained model): solves Ridge Regression over player form trajectories, team form dynamics, elite crowd consensus (League 314), and market momentum to correct model bias.
 - **Trained Points Model (hybrid)**: Gradient boosting over point-in-time features (rolling minutes, xG/xA/bonus/saves per 90, team attack/defence form, opponent strength, venue, double gameweeks) with a hand-built heuristic as one of its features and as the benchmark to beat. Trained on the vaastav/Fantasy-Premier-League seasons plus the current season from the FPL API; news (injury/suspension) availability is applied on top at prediction time.
 - **Integer-Programming Squad Optimizer**: A PuLP/CBC model picks the squad, XI, and captain together (budget, 2/5/5/3, max 3 per club, legal formations) and prices extra transfers at -4 each, so it chooses 0..N transfers and any hits on net expected gain. The same solver builds a fresh £100m squad for GW1 / Wildcard / Free Hit.
 - **Walk-Forward Backtesting Engine**: Each gameweek the model is refit only on earlier gameweeks, the bot plays its own squad (free transfers, hits, captaincy, autosubs) against the real outcome, and prediction error is reported against baselines. See `python main.py backtest --season 2025-26`.

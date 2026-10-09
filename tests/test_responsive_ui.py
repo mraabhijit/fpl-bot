@@ -52,7 +52,7 @@ def test_theme_and_collapsible_components(client):
     assert "section-header-collapsible" in text
     assert "toggleSection" in text
     assert "backtest-collapsible" in text
-    assert "diff-collapsible" in text
+    assert "diff-collapsible" not in text  # the adaptive-learning card was removed from the dashboard
     assert "audit-collapsible" in text
 
 
