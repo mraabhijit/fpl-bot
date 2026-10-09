@@ -21,9 +21,8 @@ The system maximizes expected points over a rolling multi-gameweek horizon while
   - **Dual Serving**: Host locally via FastAPI (`localhost:8000`) or view static deployment on GitHub Pages.
 - **Gated GitHub Actions Automation**: Replaced continuous intermediate builds with two focused milestones:
   1. **T-3h Transfer Deadline Milestone**: Executes primary optimization 3 hours before gameweek deadline.
-  2. **00:00 IST Daily Matchday & Settlement**: Settle autosubs, calculate bonus points, and retrain adaptive learning residuals.
+  2. **00:00 IST Daily Refresh**: Re-run the optimizer with the latest results, prices and news, and republish the dashboard.
   - Automated workflow skips redundant builds and static site deployments when no milestone is due.
-- **Adaptive Multi-Factor Learning** (CLI only; not shown on the dashboard and no longer applied to predictions, which now come from the trained model): solves Ridge Regression over player form trajectories, team form dynamics, elite crowd consensus (League 314), and market momentum to correct model bias.
 - **Trained Points Model (hybrid)**: Gradient boosting over point-in-time features (rolling minutes, xG/xA/bonus/saves per 90, team attack/defence form, opponent strength, venue, double gameweeks) with a hand-built heuristic as one of its features and as the benchmark to beat. Trained on the vaastav/Fantasy-Premier-League seasons plus the current season from the FPL API; news (injury/suspension) availability is applied on top at prediction time.
 - **Integer-Programming Squad Optimizer**: A PuLP/CBC model picks the squad, XI, and captain together (budget, 2/5/5/3, max 3 per club, legal formations) and prices extra transfers at -4 each, so it chooses 0..N transfers and any hits on net expected gain. The same solver builds a fresh £100m squad for GW1 / Wildcard / Free Hit.
 - **Walk-Forward Backtesting Engine**: Each gameweek the model is refit only on earlier gameweeks, the bot plays its own squad (free transfers, hits, captaincy, autosubs) against the real outcome, and prediction error is reported against baselines. See `python main.py backtest --season 2025-26`.
@@ -56,10 +55,6 @@ fpl-bot/
 │   │   ├── fpl_api.py         # Official Fantasy Premier League REST client
 │   │   ├── fpl_auth.py        # Authentication session management
 │   │   ├── scheduler.py       # Dynamic deadline countdown and milestone scheduler
-│   │   ├── differential_trainer.py # Adaptive Multi-Factor Ridge Regression
-│   │   ├── team_form_service.py    # Rolling team offensive & defensive form dynamics
-│   │   ├── consensus_service.py    # Elite manager crowd consensus (League 314)
-│   │   ├── settlement_service.py   # Matchday autosubs and bonus points settlement
 │   │   ├── static_export.py   # Static bundle generator for GitHub Pages
 │   │   ├── notification_service.py # System alerts and webhook notifications
 │   │   ├── transaction_service.py  # FPL live transfer and lineup submission
@@ -171,31 +166,12 @@ python main.py export --output-dir dist
 ### 6. Scheduled Milestone Evaluation
 Evaluate distance to deadline and trigger stage optimization:
 ```bash
-# Automatic stage detection based on milestones (T-3h or 00:00 IST settlement)
+# Automatic stage detection based on milestones (T-3h or the 00:00 IST refresh)
 python main.py scheduled --stage auto
 
 # Force execution regardless of deadline timing
 python main.py scheduled --stage primary --force
 ```
-
-### 7. Adaptive Multi-Factor Differential Learning
-Settle completed gameweek match telemetry, compute prediction residuals, and retrain the adaptive model using regularized Multi-Factor Ridge Regression:
-```bash
-# Retrain model on completed gameweeks using Multi-Factor Ridge Regression
-python main.py retrain --gameweek 4
-
-# Inspect gameweek error report, learned feature weights, elite consensus, and team form
-python main.py differentials --gameweek 4
-```
-
-Features incorporated in weekly retraining:
-- **Historical Residual Prior**: Empirical Bayes shrinkage over past gameweeks.
-- **Player Form Trajectory**: Form acceleration and goal involvement efficiency delta (GI vs xGI).
-- **Team Form Dynamics**: Rolling 3-match offensive potency and defensive fragility indices with real club names.
-- **Elite Crowd Consensus**: Effective ownership ($EO^{\text{elite}}$) and captaincy concentration among top overall managers in the world (League 314).
-- **Market Transfer Momentum**: Normalized net event transfer velocity from official telemetry.
-
-All retrained checkpoints are bounded within $[-2.0, +2.0]$ points to prevent erratic swings while systematically correcting model bias. Retraining executes autonomously inside GitHub Actions runners during post-gameweek workflow runs, with model weights and the SQLite database cached across runs via `actions/cache@v4`.
 
 ---
 
@@ -206,7 +182,7 @@ The repository includes an automated workflow (`.github/workflows/optimizer.yml`
 ### Milestone Schedule
 
 The GitHub Actions workflow runs on an automated schedule:
-- **Daily 00:00 IST (`18:30 UTC`)**: Runs daily matchday and post-matchday settlement for autosubs, bonus points, and adaptive learning residual updates.
+- **Daily 00:00 IST (`18:30 UTC`)**: Refreshes the optimizer and dashboard with the day's results, prices and news.
 - **Hourly Check (`0 * * * *`)**: Evaluates the upcoming gameweek deadline countdown and triggers the primary optimization cycle when within the **T-3h window** (150–210 minutes before deadline).
 - **Elimination of Intermediate Builds**: Outside of these milestones, execution is skipped (`executed: false`), bypassing redundant test runs and static site builds to conserve GitHub Actions minutes.
 

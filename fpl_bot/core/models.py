@@ -121,8 +121,7 @@ class PlayerProjection(BaseModel):
     expected_penalty_probability: float
     expected_set_piece_probability: float
     expected_fpl_points: float  # Next GW (calibrated)
-    base_expected_fpl_points: float = 0.0  # Raw baseline projection before differential adjustment
-    calibration_delta: float = 0.0         # Adaptive model error adjustment
+    base_expected_fpl_points: float = 0.0  # same as expected_fpl_points now that no residual adjustment is applied
     confidence: float
     horizon_points: Dict[int, float] = Field(default_factory=dict)  # 1, 3, 5, 8 GWs
 
