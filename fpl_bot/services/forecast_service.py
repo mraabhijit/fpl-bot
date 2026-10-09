@@ -37,6 +37,10 @@ class ForecastService:
             path.write_text(json.dumps(data))
         return data
 
+    def live_payload(self, gw: int, finished: bool) -> Dict[str, Any]:
+        """event/{gw}/live, cached on disk once the gameweek is finished."""
+        return self._live(gw, finished)
+
     def current_frame(self, bootstrap: Dict[str, Any], fixtures: list) -> pd.DataFrame:
         events = {e["id"]: e for e in bootstrap["events"]}
         live = {}

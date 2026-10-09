@@ -418,6 +418,14 @@ class Database:
             conn.commit()
             return rec_id
 
+    def get_recommendation_gameweeks(self) -> List[int]:
+        with self.get_connection() as conn:
+            return [r[0] for r in conn.execute("SELECT DISTINCT gameweek FROM recommendations ORDER BY gameweek")]
+
+    def get_first_recommendation_gameweek(self) -> Optional[int]:
+        gws = self.get_recommendation_gameweeks()
+        return gws[0] if gws else None
+
     def get_latest_recommendation(self, gameweek: Optional[int] = None) -> Optional[Dict[str, Any]]:
         with self.get_connection() as conn:
             cursor = conn.cursor()
