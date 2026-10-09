@@ -57,12 +57,16 @@ def export_static_site(output_dir: str = "dist") -> Dict[str, Any]:
     with open(backtests_file, "w", encoding="utf-8") as f:
         json.dump(backtests, f, indent=2)
 
-    # 5. Export Adaptive Differential Learning Telemetry
-    from fpl_bot.services.differential_trainer import differential_trainer
-    diff_summary = differential_trainer.get_differentials_summary()
-    diff_file = data_path / "differentials.json"
-    with open(diff_file, "w", encoding="utf-8") as f:
-        json.dump(diff_summary, f, indent=2)
+    # 5. Export the per-gameweek Actual Team views (the selector loads one file per gameweek)
+    from fpl_bot.services.gameweek_view import gameweek_view_service
+    gw_index = gameweek_view_service.index()
+    with open(data_path / "gameweeks.json", "w", encoding="utf-8") as f:
+        json.dump(gw_index, f, indent=2)
+    gw_dir = data_path / "gameweek"
+    gw_dir.mkdir(exist_ok=True)
+    for entry in gw_index["gameweeks"]:
+        with open(gw_dir / f"{entry['id']}.json", "w", encoding="utf-8") as f:
+            json.dump(gameweek_view_service.view(entry["id"]), f)
 
     # 6. Export index.html template
     template_src = Path(__file__).resolve().parent.parent / "web" / "templates" / "index.html"
@@ -81,5 +85,4 @@ def export_static_site(output_dir: str = "dist") -> Dict[str, Any]:
         "recommendation_json": str(rec_file),
         "audits_json": str(audits_file),
         "backtests_json": str(backtests_file),
-        "differentials_json": str(diff_file),
     }

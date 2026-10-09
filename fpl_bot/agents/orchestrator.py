@@ -206,6 +206,18 @@ class Orchestrator:
             list(players_map.values()), gw_id, fixture_scores, availabilities
         )
 
+        # Freeze the model's per-player predictions for this gameweek while its deadline is still ahead, so the
+        # dashboard can later compare them with what happened. Later runs before the deadline refresh them.
+        if next_gw and next_gw.deadline_epoch > datetime.now(timezone.utc).timestamp():
+            for pid, proj in projections.items():
+                p = players_map.get(pid)
+                if p:
+                    db.save_projection_snapshot({
+                        "gameweek": gw_id, "player_id": pid, "player_name": p.web_name, "team_id": p.team_id,
+                        "element_type": p.element_type, "base_xp": proj.expected_fpl_points,
+                        "expected_minutes": proj.expected_minutes,
+                    })
+
         # 3. Chip analysis
         history = self.api.get_entry_history(settings.team_id)
         in_first_half = gw_id <= self.FIRST_HALF_LAST_GW
