@@ -56,6 +56,8 @@ def run_diagnostic():
         print(f"  {lg}")
     print("")
     print(f"AUTHENTICATED WRITE ACCESS:\n{diag['authenticated_write_access']}")
+    if diag.get("data_source_warning"):
+        print(f"WARNING: {diag['data_source_warning']}")
     print("")
     print(f"EXECUTION MODE:\n{diag['execution_mode']}")
     print("============================================================")
