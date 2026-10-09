@@ -1605,7 +1605,7 @@
         async function apiFetch(endpoint, options = {}) {
             if (useStaticFiles) {
                 let baseName = endpoint.split('?')[0].replace(/^\/api\//, '');
-                return fetch(`./data/${baseName}.json`, options);
+                return fetch(`./data/${baseName}.json`, { cache: 'no-store', ...options });  // Pages sends max-age=600
             }
 
             try {
@@ -1613,13 +1613,13 @@
                 if (!res.ok && res.status === 404) {
                     useStaticFiles = true;
                     let baseName = endpoint.split('?')[0].replace(/^\/api\//, '');
-                    return fetch(`./data/${baseName}.json`, options);
+                    return fetch(`./data/${baseName}.json`, { cache: 'no-store', ...options });  // Pages sends max-age=600
                 }
                 return res;
             } catch (err) {
                 useStaticFiles = true;
                 let baseName = endpoint.split('?')[0].replace(/^\/api\//, '');
-                return fetch(`./data/${baseName}.json`, options);
+                return fetch(`./data/${baseName}.json`, { cache: 'no-store', ...options });  // Pages sends max-age=600
             }
         }
 

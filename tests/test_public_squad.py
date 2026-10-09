@@ -75,3 +75,9 @@ def test_pending_transfer_is_applied_to_squad_bank_and_free_transfers():
 def test_dashboard_has_freshness_banner():
     html = (Path(__file__).resolve().parent.parent / "fpl_bot" / "web" / "templates" / "index.html").read_text()
     assert 'id="freshness"' in html and "renderFreshness(diag)" in html
+
+
+def test_static_data_fetches_bypass_the_browser_cache():
+    html = (Path(__file__).resolve().parent.parent / "fpl_bot" / "web" / "templates" / "index.html").read_text()
+    assert html.count("`./data/${baseName}.json`, { cache: 'no-store'") == 3
+    assert "`./data/${baseName}.json`, options" not in html
