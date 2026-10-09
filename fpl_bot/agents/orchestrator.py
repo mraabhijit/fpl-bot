@@ -49,6 +49,19 @@ class Orchestrator:
                     available.append(f"{label} {half}")
         return available
 
+    @staticmethod
+    def _squad_values(current_squad: CurrentSquad, authenticated: bool = True) -> Dict[str, Optional[str]]:
+        """
+        FPL's "squad value" is the sum of current market prices. What you would actually get for selling the
+        squad is lower (half of any price rise is kept by FPL), and that is what the transfer budget uses.
+        Real selling prices need an authenticated session; without one they are unknown, so none is shown.
+        """
+        market = sum(p.player.now_cost for p in current_squad.picks if p.player)
+        return {
+            "team_value": f"£{market / 10:.1f}m",
+            "sell_value": f"£{current_squad.value / 10:.1f}m" if authenticated else None,
+        }
+
     def run_diagnostic(self) -> Dict[str, Any]:
         """
         Executes Section 28: First Diagnostic Run.
@@ -120,7 +133,7 @@ class Orchestrator:
             "overall_points": latest_history.get("total_points", entry.get("summary_overall_points", 0)),
             "invitation_leagues": invitation_leagues,
             "primary_invitation_league": primary_inv,
-            "team_value": f"£{current_squad.value / 10:.1f}m",
+            **self._squad_values(current_squad, authenticated=bool(auth_valid)),
             "bank": f"£{current_squad.bank / 10:.1f}m",
             "free_transfers": current_squad.free_transfers,
             "current_xi": [
