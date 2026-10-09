@@ -31,6 +31,24 @@ class Orchestrator:
         self.player_data = player_data_service
         self.target_tz = zoneinfo.ZoneInfo(settings.timezone)
 
+    CHIP_NAMES = {"wildcard": "Wildcard", "freehit": "Free Hit", "bboost": "Bench Boost", "3xc": "Triple Captain"}
+    FIRST_HALF_LAST_GW = 19
+
+    @classmethod
+    def _available_chips(cls, chips_played: List[Dict[str, Any]], gameweek: int) -> List[str]:
+        """
+        Every chip is available once in each half of the season (GW1-19, GW20-38). The API reports chips by
+        short names (wildcard, freehit, bboost, 3xc) together with the event they were played in.
+        """
+        current_half = 1 if gameweek <= cls.FIRST_HALF_LAST_GW else 2
+        used = {(c.get("name"), 1 if c.get("event", 0) <= cls.FIRST_HALF_LAST_GW else 2) for c in chips_played}
+        available = []
+        for key, label in cls.CHIP_NAMES.items():
+            for half in range(current_half, 3):
+                if (key, half) not in used:
+                    available.append(f"{label} {half}")
+        return available
+
     def run_diagnostic(self) -> Dict[str, Any]:
         """
         Executes Section 28: First Diagnostic Run.
@@ -70,9 +88,7 @@ class Orchestrator:
         captain = next((p for p in current_squad.picks if p.is_captain), None)
         vice = next((p for p in current_squad.picks if p.is_vice_captain), None)
 
-        used_chips = [c.get("name") for c in history.get("chips", [])]
-        all_chips = ["Wildcard 1", "Wildcard 2", "Free Hit 1", "Free Hit 2", "Bench Boost 1", "Bench Boost 2", "Triple Captain 1", "Triple Captain 2"]
-        available_chips = [c for c in all_chips if c.lower().replace(" 1", "").replace(" 2", "") not in used_chips]
+        available_chips = self._available_chips(history.get("chips", []), gw_num)
 
         classic_leagues = entry.get("leagues", {}).get("classic", [])
         h2h_leagues = entry.get("leagues", {}).get("h2h", [])
@@ -171,7 +187,11 @@ class Orchestrator:
 
         # 3. Chip analysis
         history = self.api.get_entry_history(settings.team_id)
-        used_chips = [c.get("name") for c in history.get("chips", [])]
+        in_first_half = gw_id <= self.FIRST_HALF_LAST_GW
+        used_chips = [  # chips come back at GW20, so only this half's plays count
+            c.get("name") for c in history.get("chips", [])
+            if (c.get("event", 0) <= self.FIRST_HALF_LAST_GW) == in_first_half
+        ]
         chip_rec = chip_agent.evaluate_chips(gw_id, current_squad, projections, used_chips)
 
         # 4. Optimization

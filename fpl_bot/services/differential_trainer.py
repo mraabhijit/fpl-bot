@@ -18,12 +18,22 @@ from fpl_bot.services.consensus_service import consensus_service
 from fpl_bot.services.team_form_service import team_form_service
 
 
-TEAM_SHORT_TO_ID = {
+# Last-resort fallback only: club ids change every season, so the live mapping from bootstrap-static is preferred.
+_FALLBACK_TEAM_SHORT_TO_ID = {
     "ARS": 1, "AVL": 2, "BOU": 3, "BRE": 4, "BHA": 5,
     "CHE": 6, "CRY": 7, "EVE": 8, "FUL": 9, "IPS": 10,
     "LEI": 11, "LIV": 12, "MCI": 13, "MUN": 14, "NEW": 15,
     "NFO": 16, "SOU": 17, "TOT": 18, "WHU": 19, "WOL": 20
 }
+
+def team_short_to_id() -> Dict[str, int]:
+    """Current season's short-name -> team id mapping from the FPL API (promoted/relegated clubs change ids)."""
+    try:
+        from fpl_bot.services.fpl_api import fpl_api
+        return {t["short_name"]: t["id"] for t in fpl_api.get_bootstrap_static()["teams"]}
+    except Exception:
+        return _FALLBACK_TEAM_SHORT_TO_ID
+
 
 FEATURE_NAMES = [
     "intercept",
@@ -185,10 +195,11 @@ class DifferentialTrainer:
         X: List[List[float]] = []
         y: List[float] = []
 
+        team_ids = team_short_to_id()
         for r in rows:
             pid = r["player_id"]
             tm_short = r.get("team_short_name", "")
-            tid = TEAM_SHORT_TO_ID.get(tm_short, 0)
+            tid = team_ids.get(tm_short, 0)
             tf = team_forms.get(tid, {})
 
             # Features:
@@ -352,7 +363,7 @@ class DifferentialTrainer:
             x2 = float(p_form - p_ppg)
 
             # Team attacking momentum
-            tm_id = getattr(player, "team_id", 0) or TEAM_SHORT_TO_ID.get(team_short_name or "", 0)
+            tm_id = getattr(player, "team_id", 0) or team_short_to_id().get(team_short_name or "", 0)
             team_form_data = team_form_service.get_all_team_form_metrics()
             x3 = float(team_form_data.get(tm_id, {}).get("attack_momentum_index", 0.0))
 
