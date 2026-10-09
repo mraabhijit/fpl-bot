@@ -119,11 +119,21 @@ def run_optimization():
     print("============================================================")
 
 
-def run_backtests():
+def run_backtests(season: str = None):
+    if season:
+        print(f"Walk-forward backtest of {season} (no FPL API; model refitted on earlier gameweeks only)...")
+        out = backtesting_engine.run_past_season(season)
+        print(f"{'Strategy':<12}{'Points':>8}{'Hits':>6}{'MAE':>8}{'RMSE':>8}{'Spearman':>10}")
+        print("-" * 52)
+        runs = {"model": out["model"], **out["baselines"]}
+        for name, run in runs.items():
+            q = out["prediction_quality"][name]
+            print(f"{name:<12}{run.total_points:>8.0f}{run.total_hits:>6}{q['mae']:>8.2f}{q['rmse']:>8.2f}{q['spearman']:>10.3f}")
+        return
     latest_gw = backtesting_engine.get_latest_completed_gameweek()
-    print(f"Running historical backtest simulation for GW2-GW{latest_gw} (zero data leakage)...")
+    print(f"Running walk-forward backtest for GW1-GW{latest_gw} (zero data leakage)...")
     results = backtesting_engine.run_all_historical(up_to_gw=latest_gw)
-    print(f"{'GW':<5}{'Projected':<12}{'Optimized':<12}{'Hold/Act':<12}{'Delta':<8}{'Cap Success':<12}")
+    print(f"{'GW':<5}{'Projected':<12}{'Bot':<12}{'Manager':<12}{'Delta':<8}{'Cap Best':<12}")
     print("-" * 65)
     for r in results:
         cap_str = "YES" if r.captain_success else "NO"
@@ -211,7 +221,8 @@ def main():
 
     subparsers.add_parser("diagnostic", help="Run diagnostic health check")
     subparsers.add_parser("optimize", help="Run strategic optimization cycle")
-    subparsers.add_parser("backtest", help="Run historical backtesting")
+    bt = subparsers.add_parser("backtest", help="Run walk-forward backtesting")
+    bt.add_argument("--season", help="Validate on a completed past season (e.g. 2025-26) instead of the live one")
     subparsers.add_parser("server", help="Start web dashboard server")
 
     export_p = subparsers.add_parser("export", help="Export static site for GitHub Pages")
@@ -234,7 +245,7 @@ def main():
     elif args.command == "optimize":
         run_optimization()
     elif args.command == "backtest":
-        run_backtests()
+        run_backtests(args.season)
     elif args.command == "server":
         run_server()
     elif args.command == "export":

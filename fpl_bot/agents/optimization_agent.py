@@ -14,6 +14,10 @@ from fpl_bot.core.models import (
 from fpl_bot.core.constraints import validate_formation, validate_squad_composition, validate_captaincy, VALID_FORMATIONS
 from fpl_bot.core.scoring import ScoringEngine
 from fpl_bot.core.risk import RiskEngine
+from fpl_bot.core.squad_solver import Candidate, solve_squad
+
+MAX_EXTRA_HITS = 2          # at most this many transfers beyond the free ones
+FREE_TRANSFER_MIN_GAIN = 0.4  # points a no-hit transfer plan must add over holding
 
 
 class OptimizationAgent:
@@ -43,13 +47,15 @@ class OptimizationAgent:
         (optimal_bench_order, starting_xi_xp, bench_autosub_xp, total_squad_xp, sub_probabilities, sequence_reasons)
         """
         def get_xp(p: Player) -> float:
+            """Unconditional expected points (already includes minutes risk and news availability)."""
             proj = projections.get(p.id)
             return proj.expected_fpl_points if proj else 0.0
 
         def get_play_prob(p: Player) -> float:
             avail = availabilities.get(p.id)
             if avail:
-                return max(0.05, min(0.99, avail.availability_probability * avail.start_probability))
+                # start_probability already folds in availability (see NewsService), so it is not multiplied again
+                return max(0.05, min(0.99, avail.start_probability))
             if p.chance_of_playing_next_round is not None:
                 return max(0.05, min(0.99, p.chance_of_playing_next_round / 100.0))
             if p.status in ("i", "s", "u"):
@@ -58,11 +64,15 @@ class OptimizationAgent:
                 return 0.50
             return 0.92
 
+        def get_cond_xp(p: Player) -> float:
+            """Points if he plays. prob * cond_xp == get_xp, so availability is counted exactly once."""
+            return min(20.0, get_xp(p) / get_play_prob(p))
+
         # 1. Goalkeeper expected contribution
         gk0_prob = get_play_prob(starting_gk)
-        gk0_xp = get_xp(starting_gk)
+        gk0_xp = get_cond_xp(starting_gk)
         gk1_prob = get_play_prob(bench_gk)
-        gk1_xp = get_xp(bench_gk)
+        gk1_xp = get_cond_xp(bench_gk)
 
         gk_expected = (gk0_prob * gk0_xp) + ((1.0 - gk0_prob) * gk1_prob * gk1_xp)
         gk_sub_prob = round((1.0 - gk0_prob) * gk1_prob, 3)
@@ -70,15 +80,15 @@ class OptimizationAgent:
         # 2. Outfield Starters setup
         outfield_starters = [p for p in starting_xi if p.element_type != 1]
         starters_data = [
-            {"player": p, "pos": p.element_type, "xp": get_xp(p), "prob": get_play_prob(p)}
+            {"player": p, "pos": p.element_type, "xp": get_cond_xp(p), "prob": get_play_prob(p)}
             for p in outfield_starters
         ]
 
         # Captain & Vice-captain probabilities
         cap_prob = get_play_prob(captain)
-        cap_xp = get_xp(captain)
+        cap_xp = get_cond_xp(captain)
         vice_prob = get_play_prob(vice_captain)
-        vice_xp = get_xp(vice_captain)
+        vice_xp = get_cond_xp(vice_captain)
         # Captain bonus (1x extra): if captain plays, +cap_xp; if captain misses out, +vice_xp (if vice plays)
         captain_bonus_expected = (cap_prob * cap_xp) + ((1.0 - cap_prob) * vice_prob * vice_xp)
 
@@ -92,7 +102,7 @@ class OptimizationAgent:
 
         # 3. Outfield Bench Subs setup (3 players)
         bench_data = [
-            {"player": p, "pos": p.element_type, "xp": get_xp(p), "prob": get_play_prob(p)}
+            {"player": p, "pos": p.element_type, "xp": get_cond_xp(p), "prob": get_play_prob(p)}
             for p in bench_outfield
         ]
 
@@ -332,90 +342,91 @@ class OptimizationAgent:
             approval_status="AUTO_ALLOWED"
         )
 
-        # 2. Transfer Evaluation across all 15 squad slots
-        bank = current_squad.bank
+        # 2. Transfer search: integer program over every player, once without hits and once allowing them.
+        pick_by_id = {p.element_id: p for p in current_squad.picks}
 
-        candidates_by_pos: Dict[int, List[Player]] = {1: [], 2: [], 3: [], 4: []}
-        for p in all_players.values():
-            if p.id in squad_player_ids:
-                continue
-            if p.status in ("i", "s", "u"):
-                continue
-            candidates_by_pos[p.element_type].append(p)
-
-        def candidate_xp(p: Player) -> float:
+        def xp_of(p: Player) -> float:
             proj = projections.get(p.id)
             return proj.expected_fpl_points if proj else 0.0
 
-        for pos in candidates_by_pos:
-            candidates_by_pos[pos].sort(key=candidate_xp, reverse=True)
-            candidates_by_pos[pos] = candidates_by_pos[pos][:15]
+        candidates = []
+        for p in all_players.values():
+            owned = p.id in pick_by_id
+            if not owned and p.status in ("i", "s", "u"):
+                continue
+            sell = None
+            if owned:
+                pick = pick_by_id[p.id]
+                sell = pick.selling_price if pick.selling_price is not None else p.now_cost
+            candidates.append(Candidate(p.id, p.element_type, p.team_id, p.now_cost, xp_of(p), sell))
 
-        best_1_move = None  # (p_out, p_in, new_opt_tuple, net_gain)
+        free_transfers = max(1, current_squad.free_transfers)
+        hit_cost = settings.hit_penalty_cost
+        options = []
+        for allow_hits in (False, True):
+            try:
+                res = solve_squad(
+                    candidates, owned=squad_player_ids, bank=current_squad.bank,
+                    free_transfers=free_transfers, hit_cost=hit_cost,
+                    max_transfers=(free_transfers if not allow_hits else free_transfers + MAX_EXTRA_HITS),
+                )
+            except Exception:
+                continue
+            if not res.transfers_in or (res.hits > 0 and not allow_hits):
+                continue
+            new_squad = [all_players[i] for i in res.squad]
+            opt_res = self.optimize_lineup_and_captain(new_squad, projections, availabilities)
+            cost = hit_cost * res.hits
+            options.append((opt_res[6] - cost - hold_total_xp, res, opt_res))
 
-        for p_out in squad_players:
-            available_funds = bank + p_out.now_cost
+        best = max(options, key=lambda o: o[0], default=None)
+        if best is None:
+            return best_recommendation
+        net_gain, res, opt_res = best
+        min_gain = settings.hit_minimum_gain_threshold if res.hits > 0 else FREE_TRANSFER_MIN_GAIN
+        if net_gain <= min_gain:
+            return best_recommendation
 
-            for p_in in candidates_by_pos.get(p_out.element_type, []):
-                if p_in.now_cost > available_funds:
-                    continue
-
-                # Check 3 per club rule
-                club_count = sum(1 for p in squad_players if p.team_id == p_in.team_id and p.id != p_out.id)
-                if club_count >= 3:
-                    continue
-
-                new_squad = [p for p in squad_players if p.id != p_out.id] + [p_in]
-                opt_res = self.optimize_lineup_and_captain(new_squad, projections, availabilities)
-                new_total_xp = opt_res[6]
-                net_gain = new_total_xp - hold_total_xp
-
-                if best_1_move is None or net_gain > best_1_move[3]:
-                    best_1_move = (p_out, p_in, opt_res, net_gain)
-
-        # Check if transfer improves squad total
-        if best_1_move and best_1_move[3] > 0.4:
-            p_out, p_in, opt_res, net_gain = best_1_move
-            (
-                new_xi,
-                new_bench,
-                new_cap,
-                new_vice,
-                new_xi_xp,
-                new_bench_xp,
-                new_total_xp,
-                new_sub_probs,
-                new_seq_reasons
-            ) = opt_res
-
-            best_recommendation = Recommendation(
-                gameweek=gameweek,
-                transfers_in=[p_in.id],
-                transfers_out=[p_out.id],
-                starting_xi=new_xi,
-                bench_order=new_bench,
-                captain_id=new_cap,
-                vice_captain_id=new_vice,
-                hit_count=0,
-                hit_cost=0,
-                expected_points_hold=hold_total_xp,
-                expected_points_recommended=new_total_xp,
-                starting_xi_expected_points=new_xi_xp,
-                bench_expected_points=new_bench_xp,
-                bench_autosub_probabilities=new_sub_probs,
-                expected_net_gain=round(net_gain, 2),
-                reasons=[
-                    f"Transfer IN {p_in.web_name} ({p_in.team_short_name} {p_in.position_name}) for {p_out.web_name} ({p_out.team_short_name} {p_out.position_name})",
-                    f"Total 15-player squad expected points improves from {hold_total_xp:.1f} to {new_total_xp:.1f} pts (Net Gain: +{net_gain:.1f} pts)",
-                    f"Starters contribution: {new_xi_xp:.1f} pts | Bench autosub coverage: {new_bench_xp:.1f} pts",
-                    "Subs lineup sequence optimized for formation legality:"
-                ] + new_seq_reasons,
-                risk_assessment="Free transfer within budget; no hit penalty incurred.",
-                approval_required=False,
-                approval_status="AUTO_ALLOWED"
-            )
-
-        return best_recommendation
+        (new_xi, new_bench, new_cap, new_vice, new_xi_xp, new_bench_xp, new_total_xp,
+         new_sub_probs, new_seq_reasons) = opt_res
+        # Pair each outgoing player with an incoming player of the same position (orchestrator zips them).
+        outs = sorted(res.transfers_out, key=lambda i: all_players[i].element_type)
+        ins = sorted(res.transfers_in, key=lambda i: all_players[i].element_type)
+        hit_total = int(hit_cost * res.hits)
+        move_lines = [
+            f"Transfer OUT {all_players[o].web_name} ({all_players[o].team_short_name} {all_players[o].position_name}) -> "
+            f"IN {all_players[i].web_name} ({all_players[i].team_short_name} {all_players[i].position_name})"
+            for o, i in zip(outs, ins)
+        ]
+        return Recommendation(
+            gameweek=gameweek,
+            transfers_in=ins,
+            transfers_out=outs,
+            starting_xi=new_xi,
+            bench_order=new_bench,
+            captain_id=new_cap,
+            vice_captain_id=new_vice,
+            hit_count=res.hits,
+            hit_cost=hit_total,
+            expected_points_hold=hold_total_xp,
+            expected_points_recommended=new_total_xp,
+            starting_xi_expected_points=new_xi_xp,
+            bench_expected_points=new_bench_xp,
+            bench_autosub_probabilities=new_sub_probs,
+            expected_net_gain=round(net_gain, 2),
+            reasons=move_lines + [
+                f"Squad expected points improve from {hold_total_xp:.1f} to {new_total_xp:.1f}"
+                f"{f' minus a {hit_total}-pt hit' if hit_total else ''} (net {net_gain:+.1f} pts).",
+                f"Starters contribution: {new_xi_xp:.1f} pts | Bench autosub coverage: {new_bench_xp:.1f} pts",
+                "Subs lineup sequence optimized for formation legality:",
+            ] + new_seq_reasons,
+            risk_assessment=(
+                "Free transfer(s) within budget; no hit penalty incurred." if not res.hits
+                else f"Takes a {hit_total}-pt hit; requires approval."
+            ),
+            approval_required=res.hits > 0,
+            approval_status="PENDING" if res.hits > 0 else "AUTO_ALLOWED",
+        )
 
 
 optimization_agent = OptimizationAgent()
