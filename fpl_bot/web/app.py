@@ -14,6 +14,7 @@ from fpl_bot.core.database import db
 from fpl_bot.services.fpl_auth import auth_service
 from fpl_bot.agents.orchestrator import orchestrator
 from fpl_bot.core.backtest import backtesting_engine
+from fpl_bot.services.gameweek_view import gameweek_view_service
 from fpl_bot.services.scheduler import scheduler_service
 
 app = FastAPI(title="Autonomous FPL Optimizer", version="1.1.0")
@@ -38,6 +39,27 @@ async def get_diagnostic():
     try:
         diag = orchestrator.run_diagnostic()
         return JSONResponse(diag)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/gameweeks")
+async def get_gameweeks():
+    try:
+        return JSONResponse(gameweek_view_service.index())
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/gameweek/{gameweek}")
+async def get_gameweek(gameweek: int):
+    try:
+        allowed = {g["id"] for g in gameweek_view_service.index()["gameweeks"]}
+        if gameweek not in allowed:
+            raise HTTPException(status_code=404, detail=f"No data for GW{gameweek}")
+        return JSONResponse(gameweek_view_service.view(gameweek))
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
