@@ -82,24 +82,8 @@ class ProjectionAgent:
             # The model already prices in expected minutes; news only adds injury/suspension knowledge.
             base_xp = round(model_xp * (availability.availability_probability if availability else 1.0), 2)
 
-        # Calibrated differential adjustment from adaptive learning model
-        delta = 0.0
-        try:
-            if model_xp is not None:
-                raise LookupError("trained model supersedes the residual adjustment")
-            from fpl_bot.services.differential_trainer import differential_trainer
-            delta = differential_trainer.predict_adjustment(
-                player_id=player.id,
-                element_type=player.element_type,
-                team_short_name=player.team_short_name,
-                player=player,
-                fixture_score=fixture_score
-            )
-        except Exception:
-            delta = 0.0
-
         # Calibrated expected points
-        xp_1gw = round(max(0.0, base_xp + delta), 2)
+        xp_1gw = round(max(0.0, base_xp), 2)
 
         # Multi-Gameweek Horizon Projections
         # Scale with horizon fixture scores
@@ -123,7 +107,6 @@ class ProjectionAgent:
             expected_set_piece_probability=expected_set_piece_prob,
             expected_fpl_points=xp_1gw,
             base_expected_fpl_points=base_xp,
-            calibration_delta=delta,
             confidence=confidence,
             horizon_points={
                 1: xp_1gw,
