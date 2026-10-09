@@ -74,7 +74,7 @@ def sell_price(purchase: int, current: int) -> int:
 
 def walk_forward_predictions(
     feats: pd.DataFrame, season_idx: int, start_round: int = 1, retrain_every: int = 3,
-    params: Optional[Dict] = None,
+    params: Optional[Dict] = None, exclude_prefixes: tuple = (),
 ) -> pd.Series:
     """Out-of-sample fixture-level xp for every row of ``season_idx`` from ``start_round`` on."""
     t = feats["season_idx"] * 100 + feats["round"]
@@ -86,7 +86,7 @@ def walk_forward_predictions(
             continue
         if model is None or (r - start_round) % retrain_every == 0:
             train = feats[(t < season_idx * 100 + r) & feats["played"]]
-            model = PointsModel(params).fit(train)
+            model = PointsModel(params, exclude_prefixes).fit(train)
         rows = season_rows[season_rows["round"] == r]
         preds.loc[rows.index] = model.predict_fixtures(rows)
     return preds
