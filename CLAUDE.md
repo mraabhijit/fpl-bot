@@ -41,7 +41,7 @@ An autonomous Fantasy Premier League advisor for one team (Overspent FC, ID 6834
 
 ## Secrets and auth
 - `FPL_ACCESS_TOKEN` and `FPL_REFRESH_TOKEN` are repo secrets used by `optimizer.yml`. The access token lasts 1 hour; the refresh token is single-use and returned `invalid_grant`, so it cannot renew. Expect the deployment to fall back to the public estimate until the user updates the secret.
-- `scripts/check_secrets.py` only reads (never refreshes). Never print, log or commit tokens. A tokens write to the secret store needs the user to do it.
+- `scripts/check_secrets.py` only reads (never refreshes). Never print, log or commit tokens. Writing to the secret store is the user's job.
 - Copy tokens from DevTools in full: a truncated copy contains `…` (U+2026) and fails.
 
 ## Known limits
