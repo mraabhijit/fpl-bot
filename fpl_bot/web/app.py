@@ -15,7 +15,6 @@ from fpl_bot.services.fpl_auth import auth_service
 from fpl_bot.agents.orchestrator import orchestrator
 from fpl_bot.core.backtest import backtesting_engine
 from fpl_bot.services.gameweek_view import gameweek_view_service
-from fpl_bot.services.scheduler import scheduler_service
 
 app = FastAPI(title="Autonomous FPL Optimizer", version=settings.version.lstrip("v"))
 
@@ -141,11 +140,6 @@ async def update_auth_token(req: TokenUpdateRequest):
         "status": "success" if valid else "token_stored_validation_failed",
         "is_authenticated": valid
     })
-
-
-@app.get("/api/scheduler/jobs")
-async def get_scheduler_jobs():
-    return JSONResponse(scheduler_service.get_scheduled_jobs())
 
 
 @app.get("/", response_class=HTMLResponse)

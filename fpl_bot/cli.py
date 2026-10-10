@@ -12,7 +12,6 @@ from fpl_bot.core.config import settings
 from fpl_bot.agents.orchestrator import orchestrator
 from fpl_bot.core.backtest import backtesting_engine
 from fpl_bot.core.database import db
-from fpl_bot.services.scheduler import scheduler_service
 
 
 def run_diagnostic():
@@ -145,7 +144,6 @@ def run_backtests(season: str = None):
 
 def run_server():
     print(f"Starting FPL Optimizer Server on {settings.web_host}:{settings.web_port} (Timezone: {settings.timezone})...")
-    scheduler_service.start()
     uvicorn.run("fpl_bot.web.app:app", host=settings.web_host, port=settings.web_port, reload=True)
 
 
@@ -156,24 +154,6 @@ def run_export(output_dir: str = "dist"):
     print("Static export completed successfully:")
     for k, v in res.items():
         print(f"  {k}: {v}")
-
-
-def run_scheduled(stage: str = "auto", force: bool = False):
-    print(f"Checking scheduled deadline milestones (stage={stage}, force={force})...")
-    res = scheduler_service.check_and_run_scheduled_workflow(stage=stage, force=force)
-    print("Scheduled workflow execution summary:")
-    for k, v in res.items():
-        print(f"  {k}: {v}")
-
-    # Emit output for GitHub Actions runner to gate builds
-    gh_output = os.getenv("GITHUB_OUTPUT")
-    if gh_output:
-        try:
-            with open(gh_output, "a", encoding="utf-8") as f:
-                f.write(f"executed={str(res.get('executed', False)).lower()}\n")
-                f.write(f"stage={res.get('stage', 'none')}\n")
-        except Exception as e:
-            print(f"Warning: Failed to write to GITHUB_OUTPUT: {e}")
 
 
 def main():
@@ -189,10 +169,6 @@ def main():
     export_p = subparsers.add_parser("export", help="Export static site for GitHub Pages")
     export_p.add_argument("--output-dir", "-o", default="dist", help="Output directory for static site (default: dist)")
 
-    sched_p = subparsers.add_parser("scheduled", help="Run scheduled deadline workflow evaluation")
-    sched_p.add_argument("--stage", default="auto", help="Milestone stage (auto, initial, refresh, primary, lineup_check, final_audit, safety_check)")
-    sched_p.add_argument("--force", action="store_true", help="Force optimization run regardless of deadline window")
-
     args = parser.parse_args()
 
     if args.command == "diagnostic":
@@ -205,8 +181,6 @@ def main():
         run_server()
     elif args.command == "export":
         run_export(output_dir=args.output_dir)
-    elif args.command == "scheduled":
-        run_scheduled(stage=args.stage, force=args.force)
     else:
         parser.print_help()
 
