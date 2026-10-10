@@ -1,0 +1,68 @@
+name: Claude review
+
+# Manual only: comment "@claude-review" on a PR into develop.
+# issue_comment workflows run from the default branch (main).
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  id-token: write
+
+concurrency:
+  group: claude-review-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    if: >
+      github.event.issue.pull_request &&
+      github.event.comment.author_association == 'OWNER' &&
+      contains(github.event.comment.body, '@claude-review')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Only same-repo PRs into develop
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ok=$(gh pr view ${{ github.event.issue.number }} --repo ${{ github.repository }} \
+            --json baseRefName,isCrossRepository \
+            --jq '.baseRefName == "develop" and (.isCrossRepository | not)')
+          echo "ok=$ok" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        if: steps.gate.outputs.ok == 'true'
+        with:
+          ref: refs/pull/${{ github.event.issue.number }}/head
+          fetch-depth: 0
+
+      - uses: anthropics/claude-code-action@v1
+        if: steps.gate.outputs.ok == 'true'
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: >-
+            --model claude-sonnet-5-5
+            --allowedTools "Read,Grep,Glob,Bash(git diff:*),Bash(git log:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr comment:*)"
+          prompt: |
+            Review PR #${{ github.event.issue.number }} in ${{ github.repository }}. Read CLAUDE.md first.
+            Review only the PR diff (gh pr diff). Do not edit files or push. Post ONE summary comment
+            with gh pr comment. Report real findings only, no nitpicks; say "no issues" when clean.
+
+            1. Over-engineering. One line per finding: `file:Lnn: tag what. replacement.`
+               Tags: delete, stdlib, native, yagni (abstraction with one caller, unused config),
+               shrink. Flag new dependencies a few lines of code would replace.
+               End with `net: -N lines possible`, or `Lean already. Ship.` One smoke test is
+               the minimum, never flag it.
+            2. Safety. Token or secret handling or logging; anything that writes to the FPL
+               account or turns off DRY_RUN; wider workflow permissions; unpinned third-party
+               actions; committing .env, corrections.md, FPL-Optimizer.md, dist/ or errors/.
+            3. Project rules. Features use only earlier gameweeks (shift(1)) and
+               tests/test_features_leakage.py still covers them; CRLF kept in fpl_bot/cli.py,
+               fpl_bot/agents/projection_agent.py and fpl_bot/core/models.py (a whole-file diff
+               means the endings flipped); pulp>=2.9,<3; the removed adaptive-learning and
+               differentials stack not reintroduced; no multi-gameweek planning; a version bump
+               touches pyproject.toml, fpl_bot/core/config.py and CHANGELOG.md together.
