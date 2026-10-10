@@ -1468,8 +1468,6 @@
                     body: JSON.stringify({
                         ref: 'main',
                         inputs: {
-                            stage: inputs.stage || 'auto',
-                            force: inputs.force !== undefined ? inputs.force : true,
                             run_backtest: inputs.run_backtest ? true : false
                         }
                     })
@@ -2148,7 +2146,7 @@
 
         async function runBacktest() {
             if (useStaticFiles) {
-                dispatchGitHubWorkflow({ force: true, run_backtest: true });
+                dispatchGitHubWorkflow({ run_backtest: true });
                 return;
             }
             const tbody = document.getElementById('backtest-table-body');
@@ -2160,7 +2158,7 @@
 
         async function triggerOptimization() {
             if (useStaticFiles) {
-                dispatchGitHubWorkflow({ force: true, stage: 'auto' });
+                dispatchGitHubWorkflow();
                 return;
             }
             const btn = document.getElementById('btn-run-optimizer');

@@ -19,10 +19,7 @@ The system maximizes expected points over a rolling multi-gameweek horizon while
   - **Team Form Dynamics**: Real Premier League club names (`Arsenal`, `Man City`, etc.) resolved in rolling form attack/defense leaderboards.
   - **Direct GitHub Actions Dispatch**: In-page "Run Optimizer" and "Run Backtest" buttons support ad-hoc workflow dispatching directly via GitHub REST API.
   - **Dual Serving**: Host locally via FastAPI (`localhost:8000`) or view static deployment on GitHub Pages.
-- **Gated GitHub Actions Automation**: Replaced continuous intermediate builds with two focused milestones:
-  1. **T-3h Transfer Deadline Milestone**: Executes primary optimization 3 hours before gameweek deadline.
-  2. **00:00 IST Daily Refresh**: Re-run the optimizer with the latest results, prices and news, and republish the dashboard.
-  - Automated workflow skips redundant builds and static site deployments when no milestone is due.
+- **On-Demand GitHub Actions Automation**: No scheduled or polling runs. The workflow runs only on a manual dispatch (including the dashboard's "Run Optimizer" button) or a push/merge to `main`. Each run fetches the latest points, prices and news, updates recommendations and republishes the dashboard.
 - **Gameweek Selector on the Actual Team tab**: pick any gameweek from the first one with a stored prediction up to the one after the latest finished gameweek. Finished and live gameweeks show your real lineup (captain doubling and automatic substitutions applied), real points so far, and the model's frozen pre-deadline prediction per player; an upcoming gameweek shows your saved lineup with no points yet. Predictions are saved when each recommendation is made and are never recomputed with hindsight.
 - **Trained Points Model (hybrid)**: Gradient boosting over point-in-time features (rolling minutes, xG/xA/bonus/saves per 90, team attack/defence form, opponent strength, venue, double gameweeks) with a hand-built heuristic as one of its features and as the benchmark to beat. Trained on the vaastav/Fantasy-Premier-League seasons plus the current season from the FPL API; news (injury/suspension) availability is applied on top at prediction time.
 - **Integer-Programming Squad Optimizer**: A PuLP/CBC model picks the squad, XI, and captain together (budget, 2/5/5/3, max 3 per club, legal formations) and prices extra transfers at -4 each, so it chooses 0..N transfers and any hits on net expected gain. The same solver builds a fresh £100m squad for GW1 / Wildcard / Free Hit.
@@ -36,7 +33,7 @@ The system maximizes expected points over a rolling multi-gameweek horizon while
 ```
 fpl-bot/
 ├── .github/workflows/
-│   └── optimizer.yml          # GitHub Actions scheduled workflow & Pages deployment
+│   └── optimizer.yml          # GitHub Actions workflow & Pages deployment
 ├── fpl_bot/
 │   ├── agents/
 │   │   ├── orchestrator.py    # Main workflow coordinator and stage controller
@@ -55,7 +52,6 @@ fpl-bot/
 │   ├── services/
 │   │   ├── fpl_api.py         # Official Fantasy Premier League REST client
 │   │   ├── fpl_auth.py        # Authentication session management
-│   │   ├── scheduler.py       # Dynamic deadline countdown and milestone scheduler
 │   │   ├── static_export.py   # Static bundle generator for GitHub Pages
 │   │   ├── notification_service.py # System alerts and webhook notifications
 │   │   ├── transaction_service.py  # FPL live transfer and lineup submission
@@ -164,28 +160,17 @@ Export static HTML and JSON bundles into the `dist/` directory for deployment to
 python main.py export --output-dir dist
 ```
 
-### 6. Scheduled Milestone Evaluation
-Evaluate distance to deadline and trigger stage optimization:
-```bash
-# Automatic stage detection based on milestones (T-3h or the 00:00 IST refresh)
-python main.py scheduled --stage auto
-
-# Force execution regardless of deadline timing
-python main.py scheduled --stage primary --force
-```
-
 ---
 
 ## GitHub Actions & GitHub Pages
 
 The repository includes an automated workflow (`.github/workflows/optimizer.yml`) that runs in GitHub Actions and deploys the static dashboard to GitHub Pages.
 
-### Milestone Schedule
+### Triggers
 
-The GitHub Actions workflow runs on an automated schedule:
-- **Daily 00:00 IST (`18:30 UTC`)**: Refreshes the optimizer and dashboard with the day's results, prices and news.
-- **Hourly Check (`0 * * * *`)**: Evaluates the upcoming gameweek deadline countdown and triggers the primary optimization cycle when within the **T-3h window** (150–210 minutes before deadline).
-- **Elimination of Intermediate Builds**: Outside of these milestones, execution is skipped (`executed: false`), bypassing redundant test runs and static site builds to conserve GitHub Actions minutes.
+The workflow has no `schedule` trigger. It runs on:
+- **Manual dispatch**: from the GitHub UI, or the dashboard's "Run Optimizer" button (needs a PAT with `actions:write`, stored in the browser).
+- **Push / merge to `main`** (ignoring `README.md` and `docs/**`).
 
 ### Manual Workflow Dispatch
 

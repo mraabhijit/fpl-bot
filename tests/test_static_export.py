@@ -1,13 +1,12 @@
 """
-Unit and integration tests for static site export and scheduled workflow triggers.
+Unit and integration tests for static site export.
 """
 
 import json
 from pathlib import Path
 import pytest
 from fpl_bot.services.static_export import export_static_site
-from fpl_bot.services.scheduler import scheduler_service
-from fpl_bot.cli import run_export, run_scheduled
+from fpl_bot.cli import run_export
 from fpl_bot.core.config import settings
 
 
@@ -39,31 +38,6 @@ def test_export_static_site_creates_all_artifacts(tmp_path):
         html = f.read()
         assert "Overspent FC Optimizer" in html
         assert "apiFetch" in html
-
-
-def test_check_and_run_scheduled_workflow():
-    result = scheduler_service.check_and_run_scheduled_workflow(stage="auto", force=True)
-    assert result["executed"] is True
-    assert result["gameweek"] >= 1
-    assert "stage" in result
-    assert "hours_remaining" in result
-
-
-def test_check_and_run_scheduled_workflow_skips_outside_milestones(monkeypatch):
-    # Ensure outside milestone window and not matchday
-    monkeypatch.setattr(scheduler_service, "_is_matchday_or_settlement_window", lambda gw: False)
-    # Monkeypatch mins_remaining to be 500 mins (neither T-3h nor negative)
-    orig_get_info = scheduler_service.get_next_gameweek_info
-    info = orig_get_info()
-    if info:
-        from datetime import datetime, timezone, timedelta
-        fake_deadline = datetime.now(timezone.utc) + timedelta(minutes=500)
-        info["deadline_utc"] = fake_deadline
-        monkeypatch.setattr(scheduler_service, "get_next_gameweek_info", lambda: info)
-
-    result = scheduler_service.check_and_run_scheduled_workflow(stage="auto", force=False)
-    assert result["executed"] is False
-    assert result["status"] == "SKIPPED_NO_BUILD_DUE"
 
 
 def test_cli_runners(tmp_path):
