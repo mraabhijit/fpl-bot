@@ -154,6 +154,23 @@
             flex-wrap: wrap;
         }
 
+        .p-why {
+            background: none;
+            border: none;
+            padding: 2px 0 0;
+            font-size: 10px;
+            color: var(--text-secondary);
+            text-decoration: underline;
+            cursor: pointer;
+        }
+        .p-note {
+            margin-top: 4px;
+            font-size: 10px;
+            line-height: 1.35;
+            text-align: left;
+            color: var(--text-secondary);
+            overflow-wrap: anywhere;
+        }
         .chip-info-btn {
             display: inline-flex;
             align-items: center;
@@ -1966,7 +1983,35 @@
                 ${pointsBadge}
                 ${autoSubProb}
             `;
+            if (viewMode === 'rec' && player.selection) attachSelectionNote(div, player.selection);
             return div;
+        }
+
+        // "why?" toggle: the model's rationale for this player's slot (built server-side from the same numbers the choice used).
+        function attachSelectionNote(card, sel) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'p-why';
+            btn.textContent = 'why?';
+            btn.setAttribute('aria-expanded', 'false');
+            const note = document.createElement('div');
+            note.className = 'p-note';
+            note.hidden = true;
+            const pct = v => (v === null || v === undefined) ? 'n/a' : `${Math.round(v * 100)}%`;
+            const lines = [`${sel.role}: ${sel.xp} xP`].concat(sel.notes || []);
+            lines.push(`Expected minutes ${sel.expected_minutes ?? 'n/a'} \u00b7 start ${pct(sel.start_probability)} \u00b7 FPL form ${sel.form ?? 'n/a'}`);
+            lines.forEach(t => {
+                const row = document.createElement('div');
+                row.textContent = t;
+                note.appendChild(row);
+            });
+            btn.addEventListener('click', e => {
+                e.stopPropagation();
+                note.hidden = !note.hidden;
+                btn.setAttribute('aria-expanded', String(!note.hidden));
+            });
+            card.appendChild(btn);
+            card.appendChild(note);
         }
 
         async function loadAudits() {
