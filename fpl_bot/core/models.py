@@ -182,6 +182,7 @@ class Recommendation(BaseModel):
     starting_xi_expected_points: float = 0.0
     bench_expected_points: float = 0.0
     bench_autosub_probabilities: Dict[int, float] = Field(default_factory=dict)
+    selection_explanations: Dict[int, Dict[str, Any]] = Field(default_factory=dict)  # per player: why picked / benched
     expected_net_gain: float = 0.0
     reasons: List[str] = Field(default_factory=list)
     risk_assessment: str = ""

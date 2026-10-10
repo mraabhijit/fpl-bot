@@ -165,6 +165,7 @@ class Database:
                 starting_xi_expected_points REAL DEFAULT 0.0,
                 bench_expected_points REAL DEFAULT 0.0,
                 bench_autosub_probabilities TEXT,
+                selection_explanations TEXT,
                 expected_net_gain REAL,
                 reasons TEXT,
                 risk_assessment TEXT,
@@ -180,7 +181,8 @@ class Database:
             for col_def in [
                 ("starting_xi_expected_points", "REAL DEFAULT 0.0"),
                 ("bench_expected_points", "REAL DEFAULT 0.0"),
-                ("bench_autosub_probabilities", "TEXT")
+                ("bench_autosub_probabilities", "TEXT"),
+                ("selection_explanations", "TEXT")
             ]:
                 try:
                     cursor.execute(f"ALTER TABLE recommendations ADD COLUMN {col_def[0]} {col_def[1]}")
@@ -349,8 +351,8 @@ class Database:
                 expected_points_hold, expected_points_recommended, starting_xi_expected_points,
                 bench_expected_points, bench_autosub_probabilities, expected_net_gain,
                 reasons, risk_assessment, approval_required, approval_status, execution_status,
-                transaction_hash
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                transaction_hash, selection_explanations
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 rec.get("gameweek"),
                 json.dumps(rec.get("transfers_in", [])),
@@ -373,7 +375,8 @@ class Database:
                 rec.get("approval_required", False),
                 rec.get("approval_status", "PENDING"),
                 rec.get("execution_status", "NOT_EXECUTED"),
-                rec.get("transaction_hash")
+                rec.get("transaction_hash"),
+                json.dumps(rec.get("selection_explanations", {}))
             ))
             rec_id = cursor.lastrowid
             conn.commit()
@@ -404,6 +407,7 @@ class Database:
             res["bench_order"] = json.loads(res["bench_order"] or "[]")
             res["reasons"] = json.loads(res["reasons"] or "[]")
             res["bench_autosub_probabilities"] = json.loads(res.get("bench_autosub_probabilities") or "{}")
+            res["selection_explanations"] = json.loads(res.get("selection_explanations") or "{}")
             return res
 
     def update_recommendation_status(self, rec_id: int, approval_status: str, execution_status: Optional[str] = None):

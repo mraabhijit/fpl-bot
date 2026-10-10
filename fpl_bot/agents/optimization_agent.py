@@ -18,6 +18,7 @@ from fpl_bot.core.squad_solver import Candidate, solve_squad
 
 MAX_EXTRA_HITS = 2          # at most this many transfers beyond the free ones
 FREE_TRANSFER_MIN_GAIN = 0.4  # points a no-hit transfer plan must add over holding
+FORMATION_TIE_TOLERANCE = 0.1  # starting-XI xP gap (one UI decimal) under which formations count as tied
 
 
 class OptimizationAgent:
@@ -206,13 +207,15 @@ class OptimizationAgent:
         squad_players: List[Player],
         projections: Dict[int, PlayerProjection],
         availabilities: Dict[int, PlayerAvailability]
-    ) -> Tuple[List[int], List[int], int, int, float, float, float, Dict[int, float], List[str]]:
+    ) -> Tuple[List[int], List[int], int, int, float, float, float, Dict[int, float], List[str], Dict[str, Any]]:
         """
-        Finds the globally optimal Starting XI, Formation, Captain, Vice-Captain,
-        and Subs lineup sequence across all 15 players.
+        Finds the Starting XI, Formation, Captain, Vice-Captain and Subs lineup sequence across all 15 players.
+        Formations are ranked by starting-XI expected points alone (captain bonus included). Bench auto-sub value
+        only separates formations whose XI totals are within FORMATION_TIE_TOLERANCE of the best; any remaining
+        tie goes to the formation listed first in VALID_FORMATIONS.
         Returns:
         (starting_xi_ids, bench_ids, captain_id, vice_captain_id,
-         starting_xi_xp, bench_xp, total_squad_xp, sub_probabilities, sequence_reasons)
+         starting_xi_xp, bench_xp, total_squad_xp, sub_probabilities, sequence_reasons, formation_info)
         """
         gkps = [p for p in squad_players if p.element_type == 1]
         defs = [p for p in squad_players if p.element_type == 2]
@@ -231,8 +234,7 @@ class OptimizationAgent:
         starting_gk = gkps[0]
         bench_gk = gkps[1] if len(gkps) > 1 else gkps[0]
 
-        best_total_squad_xp = -1.0
-        best_result = None
+        candidates = []
 
         # Evaluate all legal formations: (d, m, f)
         for (d_count, m_count, f_count) in VALID_FORMATIONS:
@@ -269,21 +271,128 @@ class OptimizationAgent:
                 availabilities=availabilities
             )
 
-            if total_squad_xp > best_total_squad_xp:
-                best_total_squad_xp = total_squad_xp
-                best_result = (
-                    [p.id for p in chosen_xi],
-                    bench_order,
-                    captain.id,
-                    vice_captain.id,
-                    xi_xp,
-                    bench_xp,
-                    total_squad_xp,
-                    sub_probs,
-                    seq_reasons
-                )
+            candidates.append((
+                [p.id for p in chosen_xi],
+                bench_order,
+                captain.id,
+                vice_captain.id,
+                xi_xp,
+                bench_xp,
+                total_squad_xp,
+                sub_probs,
+                seq_reasons,
+                (d_count, m_count, f_count),
+            ))
 
-        return best_result
+        best_xi_xp = max(c[4] for c in candidates)
+        tied = [c for c in candidates if c[4] >= best_xi_xp - FORMATION_TIE_TOLERANCE]
+        # max() keeps the first of equal bench values, i.e. the earlier formation in VALID_FORMATIONS
+        chosen = max(tied, key=lambda c: c[5])
+        formation_info = {
+            "chosen": list(chosen[9]),
+            "tie_break_used": len(tied) > 1,
+            "options": [
+                {"counts": list(c[9]), "xi_xp": c[4], "bench_xp": c[5]}
+                for c in sorted(candidates, key=lambda c: -c[4])
+            ],
+        }
+        return chosen[:9] + (formation_info,)
+
+    def explain_selection(
+        self,
+        squad_players: List[Player],
+        projections: Dict[int, PlayerProjection],
+        availabilities: Dict[int, PlayerAvailability],
+        result: Tuple,
+    ) -> Dict[int, Dict[str, Any]]:
+        """
+        Per-player rationale for the lineup in ``result`` (the output of optimize_lineup_and_captain): the numbers
+        behind each player's xP, why a bench player missed the XI (with the XI-xP cost of starting more of his
+        position) and how close the captaincy call was. Every figure is read from the same data the choice used.
+        """
+        xi_ids, bench_ids, cap_id, vice_id = result[0], result[1], result[2], result[3]
+        sub_probs, info = result[7], result[9]
+        by_id = {p.id: p for p in squad_players}
+        pos_label = {1: "GKP", 2: "DEF", 3: "MID", 4: "FWD"}
+        pos_index = {2: 0, 3: 1, 4: 2}
+
+        def xp(pid: int) -> float:
+            proj = projections.get(pid)
+            return proj.expected_fpl_points if proj else 0.0
+
+        chosen = info["chosen"]
+        formation = "-".join(str(n) for n in chosen)
+        tol = FORMATION_TIE_TOLERANCE
+        xi_set = set(xi_ids)
+        chosen_xi_xp = next(o["xi_xp"] for o in info["options"] if o["counts"] == chosen)
+        xi_by_xp = sorted((i for i in xi_ids if by_id[i].element_type != 1), key=xp, reverse=True)
+
+        out: Dict[int, Dict[str, Any]] = {}
+        for p in squad_players:
+            proj = projections.get(p.id)
+            avail = availabilities.get(p.id)
+            notes: List[str] = []
+            if p.id == cap_id:
+                runner = next((i for i in sorted(xi_ids, key=xp, reverse=True) if i != p.id), None)
+                role = "Captain"
+                if runner is not None:
+                    gap = xp(p.id) - xp(runner)
+                    notes.append(
+                        f"Captain: highest xP in the XI ({xp(p.id):.2f}); next is {by_id[runner].web_name} ({xp(runner):.2f}), gap {gap:.2f}"
+                        + (" (near-tie)" if gap < tol else "")
+                    )
+            elif p.id == vice_id:
+                role = "Vice-captain"
+            elif p.id in xi_set:
+                role = "Starting XI"
+            elif p.id in bench_ids:
+                slot = bench_ids.index(p.id)
+                role = "Bench: GK sub" if slot == 0 else f"Bench: Sub {slot}"
+            else:
+                role = "Not in squad"
+
+            if p.id in xi_set and p.element_type != 1:
+                same = sorted((i for i in xi_ids if by_id[i].element_type == p.element_type), key=xp, reverse=True)
+                notes.append(f"Starts: {same.index(p.id) + 1} of {len(same)} {pos_label[p.element_type]} in the XI by xP ({formation}).")
+            elif p.id not in xi_set and p.element_type != 1 and avail is not None and avail.availability_probability <= 0.0:
+                notes.append(f"Unavailable: {avail.news or 'flagged out by FPL'}.")
+            elif p.id not in xi_set and p.element_type != 1:
+                starters = [i for i in xi_ids if by_id[i].element_type == p.element_type]
+                weakest = min(starters, key=xp) if starters else None
+                idx = pos_index[p.element_type]
+                # Starters are the top of each position by xP, so he is out because the formation starts fewer of his
+                # position. Report what starting more of them (the best such formation) would do to the XI total.
+                alts = [o for o in info["options"] if o["counts"][idx] > chosen[idx]]
+                if alts:
+                    alt = max(alts, key=lambda o: o["xi_xp"])
+                    delta = alt["xi_xp"] - chosen_xi_xp
+                    notes.append(
+                        f"Left out by formation: {formation} starts {len(starters)} {pos_label[p.element_type]}. "
+                        f"{'-'.join(str(n) for n in alt['counts'])} (more of them) changes XI xP by {delta:+.2f}"
+                        + (f", within the {tol} tie tolerance so bench cover decided." if abs(delta) <= tol else ".")
+                    )
+                elif weakest is not None:
+                    notes.append(
+                        f"Below the {pos_label[p.element_type]} starters: weakest starter {by_id[weakest].web_name} "
+                        f"has {xp(weakest):.2f} xP vs his {xp(p.id):.2f}."
+                    )
+            if p.id in bench_ids and sub_probs.get(p.id) is not None:
+                notes.append(
+                    f"Bench cover only: plays if a starter misses out (chance {sub_probs[p.id] * 100:.1f}%); adds nothing if all 11 play."
+                )
+            if avail is not None and 0.0 < avail.availability_probability < 1.0:
+                notes.append(f"News multiplier x{avail.availability_probability:.2f}" + (f": {avail.news}" if avail.news else "."))
+
+            out[p.id] = {
+                "role": role,
+                "xp": round(xp(p.id), 2),
+                "availability": round(avail.availability_probability, 2) if avail else None,
+                "start_probability": round(avail.start_probability, 2) if avail else None,
+                "expected_minutes": proj.expected_minutes if proj else None,
+                "form": p.form,
+                "notes": notes,
+            }
+        return out
 
     def optimize(
         self,
@@ -313,7 +422,8 @@ class OptimizationAgent:
             hold_bench_xp,
             hold_total_xp,
             hold_sub_probs,
-            hold_seq_reasons
+            hold_seq_reasons,
+            hold_info
         ) = self.optimize_lineup_and_captain(squad_players, projections, availabilities)
 
         best_recommendation = Recommendation(
@@ -331,10 +441,14 @@ class OptimizationAgent:
             starting_xi_expected_points=hold_xi_xp,
             bench_expected_points=hold_bench_xp,
             bench_autosub_probabilities=hold_sub_probs,
+            selection_explanations=self.explain_selection(
+                squad_players, projections, availabilities,
+                (hold_xi, hold_bench, hold_cap, hold_vice, hold_xi_xp, hold_bench_xp, hold_total_xp,
+                 hold_sub_probs, hold_seq_reasons, hold_info)),
             expected_net_gain=0.0,
             reasons=[
                 "Hold squad: No transfer exceeds expected value threshold after opportunity costs.",
-                f"Full squad expected total: {hold_total_xp:.1f} pts (Starters: {hold_xi_xp:.1f} pts, Bench autosubs: {hold_bench_xp:.1f} pts).",
+                f"Expected points: {hold_xi_xp:.1f} (starting XI) + {hold_bench_xp:.1f} (bench auto-sub cover, counts only if a starter misses out) = {hold_total_xp:.1f}.",
                 "Subs lineup sequence optimized for formation legality:"
             ] + hold_seq_reasons,
             risk_assessment="Low transfer execution risk.",
@@ -388,7 +502,7 @@ class OptimizationAgent:
             return best_recommendation
 
         (new_xi, new_bench, new_cap, new_vice, new_xi_xp, new_bench_xp, new_total_xp,
-         new_sub_probs, new_seq_reasons) = opt_res
+         new_sub_probs, new_seq_reasons, _) = opt_res
         # Pair each outgoing player with an incoming player of the same position (orchestrator zips them).
         outs = sorted(res.transfers_out, key=lambda i: all_players[i].element_type)
         ins = sorted(res.transfers_in, key=lambda i: all_players[i].element_type)
@@ -413,11 +527,13 @@ class OptimizationAgent:
             starting_xi_expected_points=new_xi_xp,
             bench_expected_points=new_bench_xp,
             bench_autosub_probabilities=new_sub_probs,
+            selection_explanations=self.explain_selection(
+                [all_players[i] for i in res.squad], projections, availabilities, opt_res),
             expected_net_gain=round(net_gain, 2),
             reasons=move_lines + [
                 f"Squad expected points improve from {hold_total_xp:.1f} to {new_total_xp:.1f}"
                 f"{f' minus a {hit_total}-pt hit' if hit_total else ''} (net {net_gain:+.1f} pts).",
-                f"Starters contribution: {new_xi_xp:.1f} pts | Bench autosub coverage: {new_bench_xp:.1f} pts",
+                f"Expected points: {new_xi_xp:.1f} (starting XI) + {new_bench_xp:.1f} (bench auto-sub cover, counts only if a starter misses out).",
                 "Subs lineup sequence optimized for formation legality:",
             ] + new_seq_reasons,
             risk_assessment=(

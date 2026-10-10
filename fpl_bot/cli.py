@@ -75,7 +75,7 @@ def run_optimization():
     if is_bb:
         print(f"Projected XP: {proj_pts:.1f} pts (Bench Boost: XI {rec.starting_xi_expected_points:.1f} + Bench {rec.bench_expected_points:.1f})")
     else:
-        print(f"Projected XP: {proj_pts:.1f} pts")
+        print(f"Projected XP: {rec.starting_xi_expected_points:.1f} + {rec.bench_expected_points:.1f} bench auto-sub cover ({proj_pts + rec.bench_expected_points:.1f}) pts")
     print(f"Net Gain: +{rec.expected_net_gain:.1f} pts | Hit Cost: -{rec.hit_cost} pts")
     
     cap_p = players_map.get(rec.captain_id)
