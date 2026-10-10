@@ -336,6 +336,7 @@ class Orchestrator:
         )
 
         sub_probs = rec.get("bench_autosub_probabilities") or {}
+        explanations = rec.get("selection_explanations") or {}
 
         # 2. Current Team & Live match points for current squad event
         current_squad = self.player_data.get_current_squad()
@@ -387,6 +388,7 @@ class Orchestrator:
                 "is_vice_captain": is_vice,
                 "sub_slot_label": sub_label,
                 "autosub_probability_pct": f"{autosub_prob*100:.1f}%" if autosub_prob is not None else None,
+                "selection": explanations.get(str(pid), explanations.get(pid)),
             }
 
         # 1. Recommended Team
