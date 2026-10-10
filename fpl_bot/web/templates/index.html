@@ -1837,7 +1837,7 @@
                     if (isBenchBoost) {
                         badgeEl.textContent = `Projected XP: ${totalWithBench} pts (Bench Boost: XI ${xiXp} + Bench ${benchXp})`;
                     } else {
-                        badgeEl.textContent = `Projected XP: ${xiXp} pts`;
+                        badgeEl.textContent = projectedWithInsurance('Projected XP', xiXp, benchXp, totalWithBench);
                     }
                 } else {
                     const gwNum = teamData.gameweek || 4;
@@ -1856,7 +1856,7 @@
                         if (isBenchBoost) {
                             badgeEl.textContent = `Model Projected: ${totalWithBench} pts (Hold Strategy - Bench Boost: XI ${xiXp} + Bench ${benchXp})`;
                         } else {
-                            badgeEl.textContent = `Model Projected: ${xiXp} pts (Hold Strategy)`;
+                            badgeEl.textContent = `${projectedWithInsurance('Model Projected', xiXp, benchXp, totalWithBench)} (Hold Strategy)`;
                         }
                     } else {
                         titleEl.textContent = `Actual Team — GW${gwNum} (${teamData.formation || '3-4-3'})`;
@@ -1893,6 +1893,13 @@
                     bench.appendChild(card);
                 });
             }
+        }
+
+        // Starting-XI points plus the bench's expected auto-sub points (counted only if a starter misses out).
+        function projectedWithInsurance(label, xiXp, benchXp, total) {
+            const bench = Math.round(benchXp * 10) / 10;
+            if (!(bench > 0)) return `${label}: ${xiXp} pts`;
+            return `${label}: ${xiXp} + ${bench} (${total}) pts`;
         }
 
         function createPlayerCard(player, viewMode, actualSubMode) {
