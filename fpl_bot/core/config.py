@@ -61,12 +61,6 @@ class Settings(BaseSettings):
     # Planning Horizons (in Gameweeks)
     projection_horizons: List[int] = [1, 3, 5, 8]
 
-    # Scheduling offsets (minutes before deadline)
-    # Intermediate builds removed; only T-3h primary run before deadline
-    schedule_stages: dict = {
-        "primary": 180,     # T-3h (User primary run)
-    }
-
     # Web Dashboard
     web_host: str = "0.0.0.0"
     web_port: int = 8000
