@@ -18,6 +18,7 @@ from fpl_bot.core.squad_solver import Candidate, solve_squad
 
 MAX_EXTRA_HITS = 2          # at most this many transfers beyond the free ones
 FREE_TRANSFER_MIN_GAIN = 0.4  # points a no-hit transfer plan must add over holding
+FORMATION_TIE_TOLERANCE = 0.1  # starting-XI xP gap (one UI decimal) under which formations count as tied
 
 
 class OptimizationAgent:
@@ -208,8 +209,10 @@ class OptimizationAgent:
         availabilities: Dict[int, PlayerAvailability]
     ) -> Tuple[List[int], List[int], int, int, float, float, float, Dict[int, float], List[str]]:
         """
-        Finds the globally optimal Starting XI, Formation, Captain, Vice-Captain,
-        and Subs lineup sequence across all 15 players.
+        Finds the Starting XI, Formation, Captain, Vice-Captain and Subs lineup sequence across all 15 players.
+        Formations are ranked by starting-XI expected points alone (captain bonus included). Bench auto-sub value
+        only separates formations whose XI totals are within FORMATION_TIE_TOLERANCE of the best; any remaining
+        tie goes to the formation listed first in VALID_FORMATIONS.
         Returns:
         (starting_xi_ids, bench_ids, captain_id, vice_captain_id,
          starting_xi_xp, bench_xp, total_squad_xp, sub_probabilities, sequence_reasons)
@@ -231,8 +234,7 @@ class OptimizationAgent:
         starting_gk = gkps[0]
         bench_gk = gkps[1] if len(gkps) > 1 else gkps[0]
 
-        best_total_squad_xp = -1.0
-        best_result = None
+        candidates = []
 
         # Evaluate all legal formations: (d, m, f)
         for (d_count, m_count, f_count) in VALID_FORMATIONS:
@@ -269,21 +271,22 @@ class OptimizationAgent:
                 availabilities=availabilities
             )
 
-            if total_squad_xp > best_total_squad_xp:
-                best_total_squad_xp = total_squad_xp
-                best_result = (
-                    [p.id for p in chosen_xi],
-                    bench_order,
-                    captain.id,
-                    vice_captain.id,
-                    xi_xp,
-                    bench_xp,
-                    total_squad_xp,
-                    sub_probs,
-                    seq_reasons
-                )
+            candidates.append((
+                [p.id for p in chosen_xi],
+                bench_order,
+                captain.id,
+                vice_captain.id,
+                xi_xp,
+                bench_xp,
+                total_squad_xp,
+                sub_probs,
+                seq_reasons
+            ))
 
-        return best_result
+        best_xi_xp = max(c[4] for c in candidates)
+        tied = [c for c in candidates if c[4] >= best_xi_xp - FORMATION_TIE_TOLERANCE]
+        # max() keeps the first of equal bench values, i.e. the earlier formation in VALID_FORMATIONS
+        return max(tied, key=lambda c: c[5])
 
     def optimize(
         self,
@@ -334,7 +337,7 @@ class OptimizationAgent:
             expected_net_gain=0.0,
             reasons=[
                 "Hold squad: No transfer exceeds expected value threshold after opportunity costs.",
-                f"Full squad expected total: {hold_total_xp:.1f} pts (Starters: {hold_xi_xp:.1f} pts, Bench autosubs: {hold_bench_xp:.1f} pts).",
+                f"Expected points: {hold_xi_xp:.1f} (starting XI) + {hold_bench_xp:.1f} (bench auto-sub cover, counts only if a starter misses out) = {hold_total_xp:.1f}.",
                 "Subs lineup sequence optimized for formation legality:"
             ] + hold_seq_reasons,
             risk_assessment="Low transfer execution risk.",
@@ -417,7 +420,7 @@ class OptimizationAgent:
             reasons=move_lines + [
                 f"Squad expected points improve from {hold_total_xp:.1f} to {new_total_xp:.1f}"
                 f"{f' minus a {hit_total}-pt hit' if hit_total else ''} (net {net_gain:+.1f} pts).",
-                f"Starters contribution: {new_xi_xp:.1f} pts | Bench autosub coverage: {new_bench_xp:.1f} pts",
+                f"Expected points: {new_xi_xp:.1f} (starting XI) + {new_bench_xp:.1f} (bench auto-sub cover, counts only if a starter misses out).",
                 "Subs lineup sequence optimized for formation legality:",
             ] + new_seq_reasons,
             risk_assessment=(
