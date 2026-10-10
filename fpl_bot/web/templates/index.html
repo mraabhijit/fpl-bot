@@ -154,22 +154,31 @@
             flex-wrap: wrap;
         }
 
-        .p-why {
-            background: none;
-            border: none;
-            padding: 2px 0 0;
-            font-size: 10px;
-            color: var(--text-secondary);
-            text-decoration: underline;
-            cursor: pointer;
-        }
-        .p-note {
-            margin-top: 4px;
-            font-size: 10px;
-            line-height: 1.35;
-            text-align: left;
-            color: var(--text-secondary);
+        /* Selection rationale: one shared tooltip, positioned by JS so the pitch's overflow never clips it */
+        #sel-tip {
+            position: fixed;
+            z-index: 200;
+            max-width: 260px;
+            padding: 10px 12px;
+            background-color: var(--bg-card);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 12px;
+            line-height: 1.45;
+            pointer-events: none;
             overflow-wrap: anywhere;
+        }
+        #sel-tip[hidden] { display: none; }
+        #sel-tip div + div { margin-top: 3px; }
+        #sel-tip div:first-child { font-weight: 700; color: var(--pl-green); }
+        .player-card[data-has-tip] { cursor: help; }
+
+        :focus-visible { outline: 2px solid var(--accent-blue); outline-offset: 2px; }
+
+        @media (prefers-reduced-motion: reduce) {
+            .approval-card { animation: none; }
+            * { transition: none !important; }
         }
         .chip-info-btn {
             display: inline-flex;
@@ -766,7 +775,7 @@
             border: 1px solid var(--border-color);
             border-radius: 8px;
             padding: 14px;
-            font-family: monospace;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
             font-size: 12px;
             color: var(--pl-green);
             overflow-x: auto;
@@ -1402,11 +1411,13 @@
         </div>
     </div>
 
+    <div id="sel-tip" role="tooltip" hidden></div>
+
     <!-- Diagnostic Modal -->
     <div id="diag-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); z-index: 1000; align-items: center; justify-content: center; padding: 16px;">
         <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 24px; max-width: 700px; width: 100%; max-height: 85vh; display: flex; flex-direction: column;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                <h3 style="color: var(--pl-green); margin-bottom: 0;">System Diagnostic (Section 28)</h3>
+                <h3 style="color: var(--pl-green); margin-bottom: 0;">System Diagnostic</h3>
                 <button class="btn" onclick="closeDiagnosticModal()">Close</button>
             </div>
             <pre id="diag-content" style="overflow-y: auto; flex: 1;">Running diagnostic...</pre>
@@ -1436,7 +1447,7 @@
         function initTheme() {
             const saved = localStorage.getItem('fpl_theme');
             const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-            const theme = saved || (prefersDark ? 'dark' : 'dark');
+            const theme = saved || (prefersDark ? 'dark' : 'light');
             setTheme(theme);
         }
 
@@ -1977,42 +1988,44 @@
                 ${isCap ? '<div class="badge-captain">C</div>' : ''}
                 ${isVice ? '<div class="badge-vice">V</div>' : ''}
                 ${subBadge}
-                <div class="p-name" title="${player.first_name || ''} ${player.second_name || ''}">${player.web_name || 'Player'}</div>
+                <div class="p-name"${(viewMode === 'rec' && player.selection) ? '' : ` title="${player.first_name || ''} ${player.second_name || ''}"`}>${player.web_name || 'Player'}</div>
                 <div class="p-cost">${player.now_cost_str || ''}</div>
                 <div class="p-opp">vs ${player.next_opponent || 'TBD'}</div>
                 ${pointsBadge}
                 ${autoSubProb}
             `;
-            if (viewMode === 'rec' && player.selection) attachSelectionNote(div, player.selection);
+            if (viewMode === 'rec' && player.selection) { div.dataset.fullName = `${player.first_name || ''} ${player.second_name || ''}`.trim(); attachSelectionNote(div, player.selection); }
             return div;
         }
 
-        // "why?" toggle: the model's rationale for this player's slot (built server-side from the same numbers the choice used).
+        // Rationale for this player's slot (built server-side from the same numbers the choice used), shown on hover/focus/tap.
         function attachSelectionNote(card, sel) {
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'p-why';
-            btn.textContent = 'why?';
-            btn.setAttribute('aria-expanded', 'false');
-            const note = document.createElement('div');
-            note.className = 'p-note';
-            note.hidden = true;
             const pct = v => (v === null || v === undefined) ? 'n/a' : `${Math.round(v * 100)}%`;
-            const lines = [`${sel.role}: ${sel.xp} xP`].concat(sel.notes || []);
+            const lines = [`${[card.dataset.fullName, sel.role].filter(Boolean).join(' \u00b7 ')}: ${sel.xp} xP`].concat(sel.notes || []);
             lines.push(`Expected minutes ${sel.expected_minutes ?? 'n/a'} \u00b7 start ${pct(sel.start_probability)} \u00b7 FPL form ${sel.form ?? 'n/a'}`);
-            lines.forEach(t => {
-                const row = document.createElement('div');
-                row.textContent = t;
-                note.appendChild(row);
-            });
-            btn.addEventListener('click', e => {
-                e.stopPropagation();
-                note.hidden = !note.hidden;
-                btn.setAttribute('aria-expanded', String(!note.hidden));
-            });
-            card.appendChild(btn);
-            card.appendChild(note);
+            card.tabIndex = 0;
+            card.dataset.hasTip = '';
+            card._tipLines = lines;
+            card.addEventListener('mouseenter', () => showSelTip(card));
+            card.addEventListener('mouseleave', hideSelTip);
+            card.addEventListener('focus', () => showSelTip(card));
+            card.addEventListener('blur', hideSelTip);
+            card.addEventListener('click', e => { e.stopPropagation(); showSelTip(card); });  // touch: tap to open
         }
+
+        function showSelTip(card) {
+            const tip = document.getElementById('sel-tip');
+            tip.replaceChildren(...card._tipLines.map(t => Object.assign(document.createElement('div'), { textContent: t })));
+            tip.hidden = false;
+            const r = card.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight;
+            const left = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), window.innerWidth - w - 8);
+            const top = r.top - h - 6 >= 8 ? r.top - h - 6 : r.bottom + 6;  // flip below near the top edge
+            tip.style.left = `${left}px`;
+            tip.style.top = `${top}px`;
+        }
+        function hideSelTip() { document.getElementById('sel-tip').hidden = true; }
+        document.addEventListener('click', hideSelTip);
+        window.addEventListener('scroll', hideSelTip, { passive: true });
 
         async function loadAudits() {
             try {
